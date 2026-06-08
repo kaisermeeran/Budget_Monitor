@@ -9,6 +9,7 @@ import hashlib
 import secrets
 import time
 import threading
+import psycopg2
 from http.cookies import SimpleCookie
 
 
@@ -155,6 +156,21 @@ class BudgetHandler(SimpleHTTPRequestHandler):
             self.send_json({
                 "database_url_exists": bool(os.getenv("DATABASE_URL"))
             })
+            return
+
+        if path == "/api/debug/supabase":
+            try:
+                conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+                conn.close()
+
+                self.send_json({
+                    "connected": True
+                })
+            except Exception as e:
+                self.send_json({
+                    "connected": False,
+                    "error": str(e)
+                })
             return
 
         super().do_GET()
