@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Budget Monitor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Authentication Screens -->
+  <div id="authContainer" class="auth-container">
+    <!-- Login Screen -->
+    <section id="loginScreen" class="auth-screen active">
+      <div class="auth-card">
+        <div class="auth-header">
+          <h1>Budget Monitor</h1>
+          <p>Sign in to your account</p>
+        </div>
+        <form id="loginForm" class="auth-form">
+          <label>
+            <span>Email</span>
+            <input type="email" id="loginEmail" placeholder="you@example.com" required>
+          </label>
+          <label>
+            <span>Password</span>
+            <input type="password" id="loginPassword" placeholder="••••••••" required>
+          </label>
+          <div id="loginError" class="auth-error" aria-live="polite"></div>
+          <button type="submit" class="auth-button">Sign In</button>
+        </form>
+        <p class="auth-toggle">
+          Don't have an account? <button type="button" id="showRegister" class="link-button">Create one</button>
+        </p>
+      </div>
+    </section>
+
+    <!-- Registration Screen -->
+    <section id="registerScreen" class="auth-screen">
+      <div class="auth-card">
+        <div class="auth-header">
+          <h1>Budget Monitor</h1>
+          <p>Create your account</p>
+        </div>
+        <form id="registerForm" class="auth-form">
+          <label>
+            <span>Full Name</span>
+            <input type="text" id="registerName" placeholder="Your name" required>
+          </label>
+          <label>
+            <span>Email</span>
+            <input type="email" id="registerEmail" placeholder="you@example.com" required>
+          </label>
+          <label>
+            <span>Password</span>
+            <input type="password" id="registerPassword" placeholder="••••••••" required minlength="6">
+          </label>
+          <div id="registerError" class="auth-error" aria-live="polite"></div>
+          <button type="submit" class="auth-button">Create Account</button>
+        </form>
+        <p class="auth-toggle">
+          Already have an account? <button type="button" id="showLogin" class="link-button">Sign in</button>
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <main class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">BM</div>
+        <div>
+          <h1>Budget Monitor</h1>
+          <p>Personal finance tracker</p>
+        </div>
+      </div>
+
+      <section class="month-panel" aria-label="Month controls">
+        <label for="monthSelect">Month</label>
+        <input id="monthSelect" type="month">
+      </section>
+
+      <nav class="view-tabs" aria-label="Views">
+        <button class="tab-button active" data-view="overview" type="button">Overview</button>
+        <button class="tab-button" data-view="transactions" type="button">Transactions</button>
+        <button class="tab-button" data-view="reports" type="button">Reports</button>
+        <button class="tab-button" data-view="goals" type="button">Goals</button>
+      </nav>
+
+      <section class="quick-stats" aria-label="Quick stats">
+        <div>
+          <span>Actual Remaining</span>
+          <strong id="savedAmount">$0</strong>
+        </div>
+        <div>
+          <span>Budget Used</span>
+          <strong id="budgetUsed">0%</strong>
+        </div>
+      </section>
+    </aside>
+
+    <section class="content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Financial Budget Monitoring</p>
+          <h2 id="pageTitle">Overview</h2>
+        </div>
+        <div class="top-actions">
+          <button id="exportBtn" class="ghost-button" type="button" title="Export an Excel workbook">Export Excel</button>
+          <label class="import-button" title="Import exported Excel budget data">
+            Import Excel File
+            <input id="importInput" type="file" accept=".xls,application/vnd.ms-excel">
+          </label>
+          <div class="user-section">
+            <span id="userDisplay" class="user-name"></span>
+            <button id="logoutBtn" class="ghost-button" type="button">Logout</button>
+          </div>
+        </div>
+      </header>
+
+      <section id="overviewView" class="view active" aria-label="Overview">
+        <div class="metrics-grid">
+          <article class="metric income">
+            <span>Income Amount</span>
+            <strong id="incomeMetric">$0</strong>
+          </article>
+          <article class="metric expense">
+            <span>Expected Monthly Budget</span>
+            <strong id="expenseMetric">$0</strong>
+          </article>
+          <article class="metric savings">
+            <span>Actual Expenses</span>
+            <strong id="leftMetric">$0</strong>
+          </article>
+          <article class="metric budget">
+            <span>Expected Remaining Amount</span>
+            <strong id="remainingBudgetMetric">$0</strong>
+          </article>
+          <article class="metric actual">
+            <span>Actual Remaining</span>
+            <strong id="actualRemainingMetric">$0</strong>
+          </article>
+          <article class="metric alert">
+            <span>Overspent Amount</span>
+            <strong id="largestMetric">$0</strong>
+          </article>
+        </div>
+        <div id="overviewAlerts" class="alert-banner" aria-live="polite" hidden></div>
+
+        <div class="overview-grid">
+          <section class="panel chart-panel">
+            <div class="panel-header">
+              <h3>Category Spend</h3>
+              <span id="chartTotal">$0 total</span>
+            </div>
+            <canvas id="categoryChart" width="460" height="300" aria-label="Spending by category chart"></canvas>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h3>Income & Budget</h3>
+              <button id="resetSampleBtn" class="text-button" type="button">Load sample</button>
+            </div>
+            <form id="balanceForm" class="balance-form">
+              <label>
+                Income description
+                <div class="budget-name-input-row">
+                  <input id="incomeDescriptionInput" type="text" autocomplete="off" placeholder="Monthly salary" required>
+                  <div id="incomeSuggestionList" class="budget-suggestion-list" hidden></div>
+                </div>
+              </label>
+              <label>
+                Income amount
+                <input id="incomeInput" type="number" min="0" step="0.01" placeholder="0.00" required>
+              </label>
+              <button class="primary-button" type="submit">Save Income</button>
+            </form>
+            <div class="panel-divider"></div>
+            <form id="budgetForm" class="budget-form">
+              <label class="budget-name-row">
+                <span>Budget name</span>
+                <div class="budget-name-input-row">
+                  <input id="budgetNameInput" type="text" placeholder="House Rent" autocomplete="off" required>
+                  <div id="budgetSuggestionList" class="budget-suggestion-list" hidden></div>
+                </div>
+              </label>
+              <label>
+                Expected budget amount
+                <input id="budgetAmountInput" type="number" min="0" step="0.01" placeholder="0.00" required>
+              </label>
+              <button class="primary-button" type="submit">Add Budget</button>
+              <button id="budgetCancelBtn" class="text-button" type="button" hidden>Cancel</button>
+            </form>
+            <div class="progress-block">
+              <div class="progress-label">
+                <span>Budget used</span>
+                <strong id="limitText">$0 of $0</strong>
+              </div>
+              <div class="progress-track">
+                <div id="limitProgress" class="progress-fill"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section class="panel budget-status-panel">
+          <div class="panel-header">
+            <h3>Income</h3>
+            <span>Delete income rows to remove them from Remaining</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Description</th>
+                  <th class="amount-cell">Amount</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="incomeTable"></tbody>
+            </table>
+          </div>
+          <p id="emptyIncome" class="empty-state">Add income to calculate this month's remaining amount.</p>
+        </section>
+
+        <section class="panel budget-status-panel">
+          <div class="panel-header">
+            <h3>Budget Summary</h3>
+            <span>Remaining Budget = Expected Budget - Actual Expenses</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Budget Name</th>
+                  <th class="amount-cell">Expected Budget</th>
+                  <th class="amount-cell">Actual Expenses</th>
+                  <th class="amount-cell">Remaining Budget</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="budgetTable"></tbody>
+            </table>
+          </div>
+          <p id="emptyBudgets" class="empty-state">Create this month's expected budget to start tracking.</p>
+        </section>
+      </section>
+
+      <section id="reportsView" class="view" aria-label="Reports">
+        <section class="panel chart-panel">
+          <div class="panel-header">
+            <h3>Month Expense Comparison</h3>
+            <span id="comparisonSummary">$0 vs $0</span>
+          </div>
+          <div class="compare-controls">
+            <label>
+              Previous month
+              <select id="compareBaseMonth"></select>
+            </label>
+            <label>
+              Compare month
+              <select id="compareTargetMonth"></select>
+            </label>
+          </div>
+          <canvas id="comparisonChart" width="980" height="300" aria-label="Month expense comparison chart"></canvas>
+        </section>
+      </section>
+
+      <section id="transactionsView" class="view" aria-label="Transactions">
+        <section class="panel">
+          <div class="panel-header">
+            <h3>Add Transaction</h3>
+            <span>Income or expense</span>
+          </div>
+          <form id="transactionForm" class="transaction-form">
+            <label>
+              Type
+              <select id="typeInput">
+                <option value="expense">Expense</option>
+                <option value="income">Income</option>
+              </select>
+            </label>
+            <label>
+              Category
+              <div class="budget-name-input-row">
+                <input id="categoryInput" type="text" autocomplete="off" placeholder="House Hold expenses" required>
+                <div id="categorySuggestionList" class="budget-suggestion-list" hidden></div>
+              </div>
+            </label>
+            <label>
+              Amount
+              <input id="amountInput" type="number" min="0" step="0.01" placeholder="0.00" required>
+            </label>
+            <label>
+              Date
+              <input id="dateInput" type="date" required>
+            </label>
+            <label class="wide">
+              Note
+              <input id="noteInput" type="text" placeholder="Optional">
+            </label>
+            <button class="primary-button" type="submit">Add</button>
+            <button id="transactionCancelBtn" class="text-button" type="button" hidden>Cancel</button>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h3>Transaction List</h3>
+            <button id="clearMonthBtn" class="danger-button" type="button">Clear month</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Category</th>
+                  <th>Note</th>
+                  <th class="amount-cell">Amount</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="transactionTable"></tbody>
+            </table>
+          </div>
+          <p id="emptyTransactions" class="empty-state">No transactions for this month yet.</p>
+        </section>
+      </section>
+
+      <section id="goalsView" class="view" aria-label="Goals">
+        <section class="panel">
+          <div class="panel-header">
+            <h3>Savings Goals</h3>
+            <span>Track personal targets</span>
+          </div>
+          <form id="goalForm" class="goal-form">
+            <label>
+              Goal name
+              <input id="goalNameInput" type="text" placeholder="Emergency fund" required>
+            </label>
+            <label>
+              Target
+              <input id="goalTargetInput" type="number" min="1" step="0.01" placeholder="0.00" required>
+            </label>
+            <label>
+              Saved
+              <input id="goalSavedInput" type="number" min="0" step="0.01" placeholder="0.00" required>
+            </label>
+            <button class="primary-button" type="submit">Add Goal</button>
+          </form>
+        </section>
+        <section id="goalsList" class="goals-list"></section>
+        <p id="emptyGoals" class="empty-state">No savings goals added yet.</p>
+      </section>
+    </section>
+  </main>
+
+  <template id="goalTemplate">
+    <article class="goal-card">
+      <div class="goal-top">
+        <h3></h3>
+        <button class="icon-button" type="button" title="Delete goal">x</button>
+      </div>
+      <div class="goal-money"></div>
+      <div class="progress-track">
+        <div class="progress-fill"></div>
+      </div>
+    </article>
+  </template>
+
+  <script src="app.js?v=20260603-reports"></script>
+</body>
+</html>
