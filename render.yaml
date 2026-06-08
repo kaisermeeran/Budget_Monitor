@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: budget-monitor
+    runtime: python
+    buildCommand: ""
+    startCommand: python server.py
