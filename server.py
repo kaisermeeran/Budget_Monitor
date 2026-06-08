@@ -151,6 +151,12 @@ class BudgetHandler(SimpleHTTPRequestHandler):
             self.send_json({"users": rows})
             return
 
+        if path == "/api/debug/db":
+            self.send_json({
+                "database_url_exists": bool(os.getenv("DATABASE_URL"))
+            })
+            return
+
         super().do_GET()
 
     def do_POST(self):
