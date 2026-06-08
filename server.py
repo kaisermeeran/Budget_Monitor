@@ -142,6 +142,15 @@ class BudgetHandler(SimpleHTTPRequestHandler):
             self.send_json({"user": {"id": user['id'], "name": user['name'], "email": user['email']}})
             return
 
+        if path == "/api/debug/users":
+            with connect() as conn:
+                rows = conn.execute(
+                    "SELECT id, name, email FROM users"
+                ).fetchall()
+
+            self.send_json({"users": rows})
+            return
+
         super().do_GET()
 
     def do_POST(self):
