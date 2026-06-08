@@ -2,6 +2,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 import json
+import os
 import sqlite3
 import traceback
 
@@ -75,7 +76,7 @@ class BudgetHandler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     host = "0.0.0.0"
-    port = 8000
+    port = int(os.getenv("PORT", "8000"))
     server = ThreadingHTTPServer((host, port), BudgetHandler)
     print(f"Budget Monitor backend running at http://localhost:{port}/")
     print(f"SQLite database: {DB_PATH}")
