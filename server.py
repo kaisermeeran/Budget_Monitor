@@ -154,7 +154,7 @@ class BudgetHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/debug/db":
             self.send_json({
-                "database_url_exists": bool(os.getenv("DATABASE_URL"))
+                "database_url": os.getenv("DATABASE_URL")
             })
             return
 
