@@ -1,6 +1,4 @@
 const API_STATE = "/api/state";
-const AUTH_USER_LIST_KEY = "budget-monitor-users";
-const AUTH_CURRENT_USER_KEY = "budget-monitor-current-user";
 const LEGACY_STORAGE_KEY = "personal-budget-monitor-v1";
 const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 
@@ -94,39 +92,13 @@ function currentMonth() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function loadAuthUsers() {
-  try {
-    return JSON.parse(localStorage.getItem(AUTH_USER_LIST_KEY) || "[]");
-  } catch {
-    return [];
+function apiFetch(path, options = {}) {
+  const opts = { credentials: 'same-origin', ...options };
+  if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
+    opts.headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+    opts.body = JSON.stringify(opts.body);
   }
-}
-
-function saveAuthUsers(users) {
-  localStorage.setItem(AUTH_USER_LIST_KEY, JSON.stringify(users));
-}
-
-function getStoredCurrentUser() {
-  try {
-    return JSON.parse(localStorage.getItem(AUTH_CURRENT_USER_KEY));
-  } catch {
-    return null;
-  }
-}
-
-function setStoredCurrentUser(user) {
-  if (user) {
-    localStorage.setItem(AUTH_CURRENT_USER_KEY, JSON.stringify(user));
-    currentUser = user;
-  } else {
-    localStorage.removeItem(AUTH_CURRENT_USER_KEY);
-    currentUser = null;
-  }
-  updateUserDisplay();
-}
-
-function findUserByEmail(email) {
-  return loadAuthUsers().find((user) => user.email.toLowerCase() === email.toLowerCase());
+  return fetch(path, opts);
 }
 
 function isValidEmail(email) {
@@ -168,54 +140,75 @@ function updateUserDisplay() {
 }
 
 async function authenticateLogin(email, password) {
-  const user = findUserByEmail(email);
-  if (!user || user.password !== password) {
-    els.loginError.textContent = "Invalid email or password.";
+  els.loginError.textContent = '';
+  try {
+    const res = await apiFetch('/api/auth/login', { method: 'POST', body: { email, password } });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      els.loginError.textContent = body.error || 'Invalid credentials';
+      return false;
+    }
+    currentUser = body.user || null;
+    updateUserDisplay();
+    await loadAppState();
+    showAppShell();
+    return true;
+  } catch (e) {
+    els.loginError.textContent = 'Network error';
     return false;
   }
-  setStoredCurrentUser({ name: user.name, email: user.email });
-  await loadAppState();
-  showAppShell();
-  return true;
 }
 
 async function authenticateRegistration(name, email, password) {
+  els.registerError.textContent = '';
   if (!name.trim()) {
-    els.registerError.textContent = "Enter your full name.";
+    els.registerError.textContent = 'Enter your full name.';
     return false;
   }
   if (!isValidEmail(email)) {
-    els.registerError.textContent = "Enter a valid email address.";
+    els.registerError.textContent = 'Enter a valid email address.';
     return false;
   }
   if (password.length < 6) {
-    els.registerError.textContent = "Password must be at least 6 characters.";
+    els.registerError.textContent = 'Password must be at least 6 characters.';
     return false;
   }
-  if (findUserByEmail(email)) {
-    els.registerError.textContent = "An account already exists with this email.";
+  try {
+    const res = await apiFetch('/api/auth/register', { method: 'POST', body: { name, email, password } });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      els.registerError.textContent = body.error || 'Registration failed';
+      return false;
+    }
+    currentUser = body.user || null;
+    updateUserDisplay();
+    await loadAppState();
+    showAppShell();
+    return true;
+  } catch (e) {
+    els.registerError.textContent = 'Network error';
     return false;
   }
-  const users = loadAuthUsers();
-  users.push({ name: name.trim(), email: email.toLowerCase(), password });
-  saveAuthUsers(users);
-  setStoredCurrentUser({ name: name.trim(), email: email.toLowerCase() });
-  await loadAppState();
-  showAppShell();
-  return true;
 }
 
-function ensureAuthenticated() {
-  const storedUser = getStoredCurrentUser();
-  if (storedUser) {
-    currentUser = storedUser;
+async function ensureAuthenticated() {
+  try {
+    const res = await apiFetch('/api/auth/me');
+    if (!res.ok) {
+      hideAppShell();
+      showAuthScreen('login');
+      return false;
+    }
+    const body = await res.json().catch(() => ({}));
+    currentUser = body.user || null;
     updateUserDisplay();
     showAppShell();
     return true;
+  } catch (e) {
+    hideAppShell();
+    showAuthScreen('login');
+    return false;
   }
-  hideAppShell();
-  showAuthScreen("login");
-  return false;
 }
 
 function clearAuthFormErrors() {
@@ -229,11 +222,17 @@ function resetAuthForms() {
   clearAuthFormErrors();
 }
 
-function logoutUser() {
-  setStoredCurrentUser(null);
+async function logoutUser() {
+  try {
+    await apiFetch('/api/auth/logout', { method: 'POST' });
+  } catch (e) {
+    // ignore network errors
+  }
+  currentUser = null;
+  updateUserDisplay();
   resetAuthForms();
   hideAppShell();
-  showAuthScreen("login");
+  showAuthScreen('login');
 }
 
 function today() {
