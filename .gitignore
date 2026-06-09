@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+budget_monitor.db
+budget_monitor.db-shm
+budget_monitor.db-wal
