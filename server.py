@@ -128,11 +128,15 @@ def read_state():
         with conn.cursor() as cur:
             cur.execute("SELECT data FROM app_state WHERE id = 1")
             row = cur.fetchone()
-    return json.loads(row[0]) if row else None
+
+    if not row:
+        return None
+
+    return row[0]
 
 
 def write_state(data):
-    payload = json.dumps(data, separators=(",", ":"))
+    payload = json.dumps(data)
     with WRITE_LOCK:
         with connect() as conn:
             with conn.cursor() as cur:
@@ -177,6 +181,17 @@ class BudgetHandler(SimpleHTTPRequestHandler):
                     )
                     rows = cur.fetchall()
             self.send_json({"users": rows})
+            return
+        
+        if path == "/api/debug/supabase":
+            try:
+                with connect() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT 1")
+                        cur.fetchone()
+                self.send_json({"ok": True})
+            except Exception as exc:
+                self.send_json({"ok": False, "error": str(exc)}, status=500)
             return
 
         super().do_GET()
