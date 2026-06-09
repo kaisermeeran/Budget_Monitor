@@ -3,7 +3,6 @@ from pathlib import Path
 from urllib.parse import urlparse
 import json
 import os
-import sqlite3
 import traceback
 import hashlib
 import secrets
@@ -15,28 +14,28 @@ from http.cookies import SimpleCookie
 
 
 APP_DIR = Path(__file__).resolve().parent
-DB_PATH = APP_DIR / "budget_monitor.db"
 
-# Lock to serialize writes to SQLite (ThreadingHTTPServer uses threads)
+# Lock to serialize writes across threads
 WRITE_LOCK = threading.Lock()
 
 
 def connect():
-    conn = sqlite3.connect(DB_PATH, timeout=30)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=30000")
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY CHECK (id = 1), data TEXT NOT NULL)"
-    )
-    # Users table for server-side authentication
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, salt TEXT NOT NULL)"
-    )
-    # Sessions table stores session tokens mapped to user ids
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created_at INTEGER NOT NULL, FOREIGN KEY(user_id) REFERENCES users(id))"
-    )
-    return conn
+    return psycopg2.connect(os.environ["DATABASE_URL"],sslmode="require")
+
+
+def init_db():
+    with connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY CHECK (id = 1), data TEXT NOT NULL)"
+            )
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT, email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, salt TEXT NOT NULL)"
+            )
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created_at INTEGER NOT NULL, FOREIGN KEY(user_id) REFERENCES users(id))"
+            )
+        conn.commit()
 
 
 def hash_password(password, salt=None):
@@ -49,18 +48,28 @@ def create_user(name, email, password):
     h, salt = hash_password(password)
     with WRITE_LOCK:
         with connect() as conn:
-            cur = conn.cursor()
-            try:
-                cur.execute("INSERT INTO users (name, email, password_hash, salt) VALUES (?, ?, ?, ?)", (name, email, h, salt))
-                conn.commit()
-                return cur.lastrowid
-            except sqlite3.IntegrityError:
-                return None
+            with conn.cursor() as cur:
+                try:
+                    cur.execute(
+                        "INSERT INTO users (name, email, password_hash, salt) VALUES (%s, %s, %s, %s) RETURNING id",
+                        (name, email, h, salt),
+                    )
+                    user_id = cur.fetchone()[0]
+                    conn.commit()
+                    return user_id
+                except psycopg2.IntegrityError:
+                    conn.rollback()
+                    return None
 
 
 def find_user_by_email(email):
     with connect() as conn:
-        row = conn.execute("SELECT id, name, email, password_hash, salt FROM users WHERE email = ?", (email,)).fetchone()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, name, email, password_hash, salt FROM users WHERE email = %s",
+                (email,),
+            )
+            row = cur.fetchone()
     return row
 
 
@@ -80,7 +89,13 @@ def create_session(user_id):
     created = int(time.time())
     with WRITE_LOCK:
         with connect() as conn:
-            conn.execute("INSERT OR REPLACE INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)", (token, user_id, created))
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO sessions (token, user_id, created_at) VALUES (%s, %s, %s) "
+                    "ON CONFLICT (token) DO UPDATE SET user_id = excluded.user_id, created_at = excluded.created_at",
+                    (token, user_id, created),
+                )
+                conn.commit()
     return token
 
 
@@ -88,7 +103,12 @@ def get_user_by_session(token):
     if not token:
         return None
     with connect() as conn:
-        row = conn.execute("SELECT u.id, u.name, u.email FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.token = ?", (token,)).fetchone()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT u.id, u.name, u.email FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.token = %s",
+                (token,),
+            )
+            row = cur.fetchone()
     if not row:
         return None
     user_id, name, email = row
@@ -98,12 +118,16 @@ def get_user_by_session(token):
 def delete_session(token):
     with WRITE_LOCK:
         with connect() as conn:
-            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM sessions WHERE token = %s", (token,))
+                conn.commit()
 
 
 def read_state():
     with connect() as conn:
-        row = conn.execute("SELECT data FROM app_state WHERE id = 1").fetchone()
+        with conn.cursor() as cur:
+            cur.execute("SELECT data FROM app_state WHERE id = 1")
+            row = cur.fetchone()
     return json.loads(row[0]) if row else None
 
 
@@ -111,11 +135,13 @@ def write_state(data):
     payload = json.dumps(data, separators=(",", ":"))
     with WRITE_LOCK:
         with connect() as conn:
-            conn.execute(
-                "INSERT INTO app_state (id, data) VALUES (1, ?) "
-                "ON CONFLICT(id) DO UPDATE SET data = excluded.data",
-                (payload,),
-            )
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO app_state (id, data) VALUES (1, %s) "
+                    "ON CONFLICT (id) DO UPDATE SET data = excluded.data",
+                    (payload,),
+                )
+                conn.commit()
 
 
 class BudgetHandler(SimpleHTTPRequestHandler):
@@ -141,36 +167,6 @@ class BudgetHandler(SimpleHTTPRequestHandler):
                 self.send_json({"error": "Not authenticated"}, status=401)
                 return
             self.send_json({"user": {"id": user['id'], "name": user['name'], "email": user['email']}})
-            return
-
-        if path == "/api/debug/users":
-            with connect() as conn:
-                rows = conn.execute(
-                    "SELECT id, name, email FROM users"
-                ).fetchall()
-
-            self.send_json({"users": rows})
-            return
-
-        if path == "/api/debug/db":
-            self.send_json({
-                "database_url": os.getenv("DATABASE_URL")
-            })
-            return
-
-        if path == "/api/debug/supabase":
-            try:
-                conn = psycopg2.connect(os.getenv("DATABASE_URL"))
-                conn.close()
-
-                self.send_json({
-                    "connected": True
-                })
-            except Exception as e:
-                self.send_json({
-                    "connected": False,
-                    "error": str(e)
-                })
             return
 
         super().do_GET()
@@ -199,7 +195,7 @@ class BudgetHandler(SimpleHTTPRequestHandler):
                     self.send_json({"error": "Account already exists"}, status=400)
                     return
                 token = create_session(user_id)
-                headers = {"Set-Cookie": f"session={token}; Path=/; HttpOnly; SameSite=Lax"}
+                headers = {"Set-Cookie": f"session={token}; Path=/; HttpOnly; Secure; SameSite=Lax"}
                 self.send_json({"ok": True, "user": {"id": user_id, "name": name, "email": email}}, headers=headers)
                 return
 
@@ -211,7 +207,7 @@ class BudgetHandler(SimpleHTTPRequestHandler):
                     self.send_json({"error": "Invalid credentials"}, status=401)
                     return
                 token = create_session(user["id"])
-                headers = {"Set-Cookie": f"session={token}; Path=/; HttpOnly; SameSite=Lax"}
+                headers = {"Set-Cookie": f"session={token}; Path=/; HttpOnly; Secure; SameSite=Lax"}
                 self.send_json({"ok": True, "user": {"id": user["id"], "name": user["name"], "email": user["email"]}}, headers=headers)
                 return
 
@@ -226,7 +222,7 @@ class BudgetHandler(SimpleHTTPRequestHandler):
                 if token:
                     delete_session(token)
                 # expire cookie
-                headers = {"Set-Cookie": "session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax"}
+                headers = {"Set-Cookie": "session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Secure; SameSite=Lax"}
                 self.send_json({"ok": True}, headers=headers)
                 return
 
@@ -253,7 +249,8 @@ class BudgetHandler(SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     host = "0.0.0.0"
     port = int(os.getenv("PORT", "8000"))
+    init_db()
     server = ThreadingHTTPServer((host, port), BudgetHandler)
     print(f"Budget Monitor backend running at http://localhost:{port}/")
-    print(f"SQLite database: {DB_PATH}")
+    print("Supabase Postgres backend using DATABASE_URL")
     server.serve_forever()
