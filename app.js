@@ -3,6 +3,8 @@ const LEGACY_STORAGE_KEY = "personal-budget-monitor-v1";
 const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 
 let state;
+let dbTransactions = [];
+
 let editingBudgetId = null;
 let editingTransactionId = null;
 let currentUser = null;
@@ -64,8 +66,8 @@ const els = {
   limitText: document.querySelector("#limitText"),
   limitProgress: document.querySelector("#limitProgress"),
   transactionForm: document.querySelector("#transactionForm"),
-  typeInput: document.querySelector("#typeInput"),
-  categoryInput: document.querySelector("#categoryInput"),
+  typeInput: document.querySelector("#transactionType"),
+  categoryInput: document.querySelector("#transactionCategory"),
   incomeSuggestionList: document.querySelector("#incomeSuggestionList"),
   categorySuggestionList: document.querySelector("#categorySuggestionList"),
   amountInput: document.querySelector("#amountInput"),
@@ -73,8 +75,10 @@ const els = {
   noteInput: document.querySelector("#noteInput"),
   transactionCancelBtn: document.querySelector("#transactionCancelBtn"),
   transactionTable: document.querySelector("#transactionTable"),
+  transactionCategoryFilter: document.querySelector("#transactionCategoryFilter"),
   emptyTransactions: document.querySelector("#emptyTransactions"),
   clearMonthBtn: document.querySelector("#clearMonthBtn"),
+  
   goalForm: document.querySelector("#goalForm"),
   goalNameInput: document.querySelector("#goalNameInput"),
   goalTargetInput: document.querySelector("#goalTargetInput"),
@@ -86,6 +90,78 @@ const els = {
   importInput: document.querySelector("#importInput"),
   resetSampleBtn: document.querySelector("#resetSampleBtn")
 };
+
+async function fetchCategories() {
+  const response = await fetch("/api/categories");
+
+  if (!response.ok) {
+    throw new Error("Unable to load categories");
+  }
+
+  const data = await response.json();
+
+  return data.categories || [];
+}
+
+/*async function fetchTransactions() {
+  const response = await fetch("/api/transactions");
+
+  if (!response.ok) {
+    throw new Error("Unable to load transactions");
+  }
+
+  const data = await response.json();
+
+  return data.transactions || [];
+}*/
+
+async function fetchCategories() {
+
+    const response = await fetch("/api/categories");
+
+    if (!response.ok) {
+        throw new Error("Unable to load categories");
+    }
+
+    const data = await response.json();
+
+    return data.categories || [];
+}
+
+function renderCategoryDropdown() {
+  const categorySelect = document.getElementById("transactionCategory");
+  const typeSelect = document.getElementById("transactionType");
+
+  if (!categorySelect || !typeSelect) return;
+
+  const selectedValue = categorySelect.value;
+  const plan = getPlan();
+  const values = typeSelect.value === "income"
+    ? uniqueSorted(plan.incomes.map((item) => item.description))
+    : uniqueSorted(plan.budgets.map((item) => item.name));
+
+  categorySelect.innerHTML = "";
+
+  if (!values.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = typeSelect.value === "income"
+      ? "Add income first"
+      : "Add expected budget first";
+    option.disabled = true;
+    option.selected = true;
+    categorySelect.appendChild(option);
+    return;
+  }
+
+  for (const value of values) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    option.selected = value === selectedValue;
+    categorySelect.appendChild(option);
+  }
+}
 
 function currentMonth() {
   const now = new Date();
@@ -100,6 +176,123 @@ function apiFetch(path, options = {}) {
   }
   return fetch(path, opts);
 }
+
+async function deleteTransactionFromServer(transaction) {
+  const response = await apiFetch(`/api/transactions/${encodeURIComponent(transaction.id)}`, {
+    method: 'DELETE',
+    body: { transaction }
+  });
+  if (!response.ok) {
+    let details = '';
+    try {
+      const body = await response.json();
+      details = body && body.error ? `: ${body.error}` : '';
+    } catch (e) {
+      // ignore parse failures
+    }
+    throw new Error(`Unable to delete transaction${details}`);
+  }
+}
+
+async function updateTransactionOnServer(previousTransaction, transaction) {
+  const response = await apiFetch(`/api/transactions/${encodeURIComponent(transaction.id)}`, {
+    method: 'POST',
+    body: {
+      previousTransaction,
+      transaction
+    }
+  });
+
+  if (!response.ok) {
+    let details = '';
+    try {
+      const body = await response.json();
+      details = body && body.error ? `: ${body.error}` : '';
+    } catch (e) {
+      // ignore parse failures
+    }
+    throw new Error(`Unable to update transaction${details}`);
+  }
+
+  return response.json().catch(() => ({}));
+}
+
+async function createTransactionOnServer(transaction) {
+  const response = await apiFetch("/api/transactions", {
+    method: "POST",
+    body: transaction
+  });
+
+  if (!response.ok) {
+    let details = "";
+    try {
+      const body = await response.json();
+      details = body && body.error ? `: ${body.error}` : "";
+    } catch (e) {
+      // ignore parse failures
+    }
+    throw new Error(`Unable to create transaction${details}`);
+  }
+
+  return response.json().catch(() => ({}));
+}
+
+function confirmTransactionDelete() {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-overlay";
+    overlay.innerHTML = `
+      <div class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirmDeleteTitle">
+        <h3 id="confirmDeleteTitle">Delete transaction?</h3>
+        <p>This record will be removed from the screen and PostgreSQL.</p>
+        <div class="confirm-actions">
+          <button class="ghost-button" type="button" data-confirm="no">No</button>
+          <button class="danger-button" type="button" data-confirm="yes">Yes</button>
+        </div>
+      </div>
+    `;
+
+    function close(result) {
+      overlay.remove();
+      document.removeEventListener("keydown", onKeyDown);
+      resolve(result);
+    }
+
+    function onKeyDown(event) {
+      if (event.key === "Escape") {
+        close(false);
+      }
+    }
+
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) {
+        close(false);
+        return;
+      }
+
+      const button = event.target.closest("button[data-confirm]");
+      if (!button) return;
+      close(button.dataset.confirm === "yes");
+    });
+
+    document.addEventListener("keydown", onKeyDown);
+    document.body.appendChild(overlay);
+    overlay.querySelector("button[data-confirm='no']").focus();
+  });
+}
+
+async function loadTransactions() {
+  const response = await apiFetch("/api/transactions");
+
+  if (!response.ok) {
+    throw new Error("Unable to load transactions");
+  }
+
+  const data = await response.json();
+
+  return data.transactions || [];
+}
+
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -124,9 +317,15 @@ function hideAppShell() {
 
 async function loadAppState() {
   await loadState();
+  try {
+    await syncStateToDatabase();
+  } catch (error) {
+    console.warn("Database sync after load failed", error);
+  }
   els.monthSelect.value = state.selectedMonth;
   els.dateInput.value = defaultDateForSelectedMonth();
   render();
+  renderCategoryDropdown();
 }
 
 function updateUserDisplay() {
@@ -244,7 +443,7 @@ function defaultDateForSelectedMonth() {
 }
 
 function monthFromDate(value) {
-  return value.slice(0, 7);
+  return String(value || currentMonth()).slice(0, 7);
 }
 
 function monthsForYear(year) {
@@ -305,13 +504,46 @@ function getSampleState() {
 }
 
 async function loadState() {
-  const response = await fetch(API_STATE);
-  if (!response.ok) throw new Error("Unable to load database state.");
-  const payload = await response.json();
-  state = payload.state || loadLegacyState() || getInitialState();
-  normalizeState();
-  clearMoneyIfMonthIsEmpty();
-  await saveState();
+
+  try {
+
+    const response = await fetch(API_STATE);
+
+    if (!response.ok) {
+      throw new Error("Unable to load state");
+    }
+
+    const payload = await response.json();
+
+    state = payload.state || getInitialState();
+
+    try {
+      state.categories = await fetchCategories();
+    } catch (e) {
+      console.error("Category load failed", e);
+      state.categories = [];
+    }
+
+    try {
+      dbTransactions = await loadTransactions();
+    } catch (e) {
+      console.error("Transaction load failed", e);
+      dbTransactions = [];
+    }
+
+    normalizeState();
+    clearMoneyIfMonthIsEmpty();
+
+    console.log("STATE READY", state);
+
+  } catch (err) {
+
+    console.error(err);
+
+    state = getInitialState();
+
+    normalizeState();
+  }
 }
 
 function loadLegacyState() {
@@ -320,6 +552,26 @@ function loadLegacyState() {
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
+  }
+}
+
+async function syncStateToDatabase() {
+  if (!state) return;
+
+  const response = await apiFetch("/api/sync-state", {
+    method: "POST",
+    body: { state }
+  });
+
+  if (!response.ok) {
+    let details = "";
+    try {
+      const body = await response.json();
+      details = body && body.error ? `: ${body.error}` : "";
+    } catch (e) {
+      // ignore JSON parse errors
+    }
+    throw new Error(`Unable to sync PostgreSQL tables${details}`);
   }
 }
 
@@ -345,6 +597,11 @@ async function saveState() {
       try { render(); } catch (e) { /* ignore render errors during rollback */ }
       throw new Error(`Unable to save database state${details}`);
     }
+    try {
+      await syncStateToDatabase();
+    } catch (syncError) {
+      console.warn("PostgreSQL table sync failed; app state was saved", syncError);
+    }
   } catch (err) {
     // on network/other errors, restore previous state and re-render
     state = prevState;
@@ -360,6 +617,14 @@ function normalizeState() {
   state.goals ||= [];
   state.compareBaseMonth ||= "";
   state.compareTargetMonth ||= "";
+  state.transactions = state.transactions.map((item) => ({
+    id: item.id || crypto.randomUUID(),
+    type: item.type === "income" ? "income" : "expense",
+    category: String(item.category || "").trim(),
+    amount: Number(item.amount) || 0,
+    date: item.date || item.transaction_date || `${state.selectedMonth}-01`,
+    note: item.note || ""
+  }));
   state.savedIncomeDescriptions = uniqueSorted([
     ...(Array.isArray(state.savedIncomeDescriptions) ? state.savedIncomeDescriptions : []),
     ...Object.values(state.plans).flatMap((plan) => Array.isArray(plan.incomes) ? plan.incomes.map((item) => item.description) : [])
@@ -394,16 +659,35 @@ function uniqueSorted(values) {
 }
 
 function getPlan() {
-  if (!state.plans[state.selectedMonth]) {
-    state.plans[state.selectedMonth] = { income: 0, incomes: [], budgets: [] };
+
+  if (!state) {
+    state = getInitialState();
   }
+
+  if (!state.plans) {
+    state.plans = {};
+  }
+
+  if (!state.selectedMonth) {
+    state.selectedMonth = currentMonth();
+  }
+
+  if (!state.plans[state.selectedMonth]) {
+    state.plans[state.selectedMonth] = {
+      income: 0,
+      incomes: [],
+      budgets: []
+    };
+  }
+
   if (!Array.isArray(state.plans[state.selectedMonth].incomes)) {
     state.plans[state.selectedMonth].incomes = [];
   }
-  state.plans[state.selectedMonth].income = Number(state.plans[state.selectedMonth].income) || 0;
+
   if (!Array.isArray(state.plans[state.selectedMonth].budgets)) {
     state.plans[state.selectedMonth].budgets = [];
   }
+
   return state.plans[state.selectedMonth];
 }
 
@@ -534,6 +818,7 @@ function render() {
   renderSuggestionLists();
   renderIncomeRows();
   renderBudgets();
+  renderCategoryDropdown();
   renderTransactions();
   renderGoals();
   drawChart(categories);
@@ -756,6 +1041,7 @@ function startTransactionEdit(transactionId) {
   if (!transaction) return;
   editingTransactionId = transactionId;
   els.typeInput.value = transaction.type;
+  renderCategoryDropdown();
   els.categoryInput.value = transaction.category;
   els.amountInput.value = transaction.amount;
   els.dateInput.value = transaction.date;
@@ -770,6 +1056,7 @@ function resetTransactionEdit() {
   els.transactionForm.reset();
   els.transactionCancelBtn.hidden = true;
   els.transactionForm.querySelector("button[type=submit]").textContent = "Add";
+  renderCategoryDropdown();
 }
 
 function renderComparisonReport() {
@@ -857,9 +1144,44 @@ function renderBudgets() {
   }
 }
 
+/*async function renderCategoryDropdown() {
+
+  const select = document.getElementById("transactionCategory");
+
+  if (!select) return;
+
+  const type = document.getElementById("transactionType").value;
+
+  select.innerHTML = "";
+
+  const categories = (state.categories || [])
+    .filter(c => c.type === type.toLowerCase());
+
+  categories.forEach(category => {
+
+    const option = document.createElement("option");
+
+    option.value = category.id;
+    option.textContent = category.name;
+
+    select.appendChild(option);
+
+  });
+
+}*/
+
 function renderTransactions() {
-  const rows = monthlyTransactions();
+  const filterText = (els.transactionCategoryFilter?.value || "").trim().toLowerCase();
+  const rows = monthlyTransactions().filter((row) => {
+    if (!filterText) return true;
+    return String(row.category || "").toLowerCase().includes(filterText);
+  });
   if (els.transactionTable) els.transactionTable.innerHTML = "";
+  if (filterText && rows.length === 0) {
+    els.emptyTransactions.textContent = "there is no items";
+  } else {
+    els.emptyTransactions.textContent = "No transactions for this month yet.";
+  }
   els.emptyTransactions.hidden = rows.length > 0;
 
   for (const row of rows) {
@@ -867,7 +1189,7 @@ function renderTransactions() {
     tr.innerHTML = `
       <td>${escapeHtml(row.date)}</td>
       <td>${escapeHtml(titleCase(row.type))}</td>
-      <td>${escapeHtml(row.category)}</td>
+      <td>${escapeHtml(row.category || "")}</td>
       <td>${escapeHtml(row.note || "")}</td>
       <td class="amount-cell">${row.type === "expense" ? "-" : ""}${currency.format(row.amount)}</td>
       <td>
@@ -1355,7 +1677,7 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", (event) => {
   // Hide category suggestions if click is outside the category input
-  if (!event.target.closest("#categoryInput") && 
+  if (!event.target.closest("#transactionCategory") && 
       !event.target.closest("#categorySuggestionList")) {
     hideCategorySuggestions();
   }
@@ -1483,13 +1805,25 @@ async function saveComparisonSelection() {
 
 els.compareBaseMonth.addEventListener("change", saveComparisonSelection);
 els.compareTargetMonth.addEventListener("change", saveComparisonSelection);
+els.typeInput.addEventListener("change", renderCategoryDropdown);
+els.transactionCategoryFilter?.addEventListener("input", renderTransactions);
 
 els.transactionForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const category = els.categoryInput.value.trim();
+
+  if (!category) {
+    alert(els.typeInput.value === "income"
+      ? "Add income first, then select it for the transaction."
+      : "Add expected budget first, then select it for the transaction.");
+    els.categoryInput.focus();
+    return;
+  }
+
   const transaction = {
     id: editingTransactionId || crypto.randomUUID(),
     type: els.typeInput.value,
-    category: els.categoryInput.value.trim(),
+    category,
     amount: Number(els.amountInput.value),
     date: els.dateInput.value || defaultDateForSelectedMonth(),
     note: els.noteInput.value.trim()
@@ -1497,23 +1831,45 @@ els.transactionForm.addEventListener("submit", async (event) => {
 
   if (editingTransactionId) {
     const existingIndex = state.transactions.findIndex((item) => item.id === editingTransactionId);
+    const previousTransaction = existingIndex >= 0
+      ? { ...state.transactions[existingIndex] }
+      : null;
     if (existingIndex >= 0) {
       state.transactions[existingIndex] = transaction;
     } else {
       state.transactions.push(transaction);
     }
-    resetTransactionEdit();
+    try {
+      await updateTransactionOnServer(previousTransaction, transaction);
+    } catch (error) {
+      if (existingIndex >= 0 && previousTransaction) {
+        state.transactions[existingIndex] = previousTransaction;
+      }
+      reportError(error);
+      return;
+    }
   } else {
     state.transactions.push(transaction);
+    try {
+      await createTransactionOnServer(transaction);
+    } catch (error) {
+      state.transactions = state.transactions.filter((item) => item.id !== transaction.id);
+      reportError(error);
+      return;
+    }
   }
 
-  rememberValue("savedBudgetNames", transaction.category);
+  rememberValue(
+    transaction.type === "income" ? "savedIncomeDescriptions" : "savedBudgetNames",
+    transaction.category
+  );
   state.selectedMonth = monthFromDate(transaction.date);
   els.transactionForm.reset();
   els.monthSelect.value = state.selectedMonth;
   els.dateInput.value = defaultDateForSelectedMonth();
   try {
     await saveState();
+    resetTransactionEdit();
     render();
   } catch (error) {
     reportError(error);
@@ -1529,12 +1885,30 @@ els.transactionTable.addEventListener("click", async (event) => {
 
   const deleteButton = event.target.closest("button[data-id]");
   if (!deleteButton) return;
-  state.transactions = state.transactions.filter((item) => item.id !== deleteButton.dataset.id);
+
+  if (!(await confirmTransactionDelete())) {
+    return;
+  }
+
+  const transactionId = deleteButton.dataset.id;
+  const prevState = JSON.parse(JSON.stringify(state));
+  const transaction = state.transactions.find((item) => item.id === transactionId);
+  state.transactions = state.transactions.filter((item) => item.id !== transactionId);
   clearMoneyIfMonthIsEmpty();
+
   try {
+    if (transaction) {
+      await deleteTransactionFromServer(transaction);
+    }
     await saveState();
     render();
   } catch (error) {
+    state = prevState;
+    try {
+      render();
+    } catch (renderError) {
+      console.error(renderError);
+    }
     reportError(error);
   }
 });
@@ -1624,7 +1998,7 @@ window.addEventListener("resize", () => requestAnimationFrame(render));
 
 (async function init() {
   try {
-    if (ensureAuthenticated()) {
+    if (await ensureAuthenticated()) {
       await loadAppState();
     }
   } catch (error) {

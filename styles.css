@@ -393,6 +393,43 @@ select:focus {
   border-color: #efd0ca;
 }
 
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(23, 33, 29, 0.36);
+}
+
+.confirm-dialog {
+  width: min(360px, 100%);
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.confirm-dialog h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.confirm-dialog p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
 .text-button {
   color: var(--teal);
   background: transparent;
@@ -679,6 +716,30 @@ select:focus {
   gap: 12px;
   align-items: center;
   margin-bottom: 16px;
+}
+
+.transaction-list-actions {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.category-list-filter {
+  display: grid;
+  gap: 5px;
+  min-width: 220px;
+}
+
+.category-list-filter span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.category-list-filter input {
+  min-height: 40px;
 }
 
 .compare-controls {

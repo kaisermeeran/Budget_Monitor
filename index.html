@@ -4,12 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Budget Monitor</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260617-category-list-filter">
 </head>
 <body>
-  <!-- Authentication Screens -->
   <div id="authContainer" class="auth-container">
-    <!-- Login Screen -->
     <section id="loginScreen" class="auth-screen active">
       <div class="auth-card">
         <div class="auth-header">
@@ -23,7 +21,7 @@
           </label>
           <label>
             <span>Password</span>
-            <input type="password" id="loginPassword" placeholder="••••••••" required>
+            <input type="password" id="loginPassword" placeholder="********" required>
           </label>
           <div id="loginError" class="auth-error" aria-live="polite"></div>
           <button type="submit" class="auth-button">Sign In</button>
@@ -34,7 +32,6 @@
       </div>
     </section>
 
-    <!-- Registration Screen -->
     <section id="registerScreen" class="auth-screen">
       <div class="auth-card">
         <div class="auth-header">
@@ -52,7 +49,7 @@
           </label>
           <label>
             <span>Password</span>
-            <input type="password" id="registerPassword" placeholder="••••••••" required minlength="6">
+            <input type="password" id="registerPassword" placeholder="********" required minlength="6">
           </label>
           <div id="registerError" class="auth-error" aria-live="polite"></div>
           <button type="submit" class="auth-button">Create Account</button>
@@ -64,7 +61,7 @@
     </section>
   </div>
 
-  <main class="app-shell">
+  <main class="app-shell hidden">
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark" aria-hidden="true">BM</div>
@@ -275,17 +272,14 @@
           <form id="transactionForm" class="transaction-form">
             <label>
               Type
-              <select id="typeInput">
+              <select id="transactionType">
                 <option value="expense">Expense</option>
                 <option value="income">Income</option>
               </select>
             </label>
             <label>
               Category
-              <div class="budget-name-input-row">
-                <input id="categoryInput" type="text" autocomplete="off" placeholder="House Hold expenses" required>
-                <div id="categorySuggestionList" class="budget-suggestion-list" hidden></div>
-              </div>
+              <select id="transactionCategory"></select>
             </label>
             <label>
               Amount
@@ -307,7 +301,13 @@
         <section class="panel">
           <div class="panel-header">
             <h3>Transaction List</h3>
-            <button id="clearMonthBtn" class="danger-button" type="button">Clear month</button>
+            <div class="transaction-list-actions">
+              <label class="category-list-filter">
+                <span>Category</span>
+                <input id="transactionCategoryFilter" type="search" placeholder="Enter category name" autocomplete="off">
+              </label>
+              <button id="clearMonthBtn" class="danger-button" type="button">Clear month</button>
+            </div>
           </div>
           <div class="table-wrap">
             <table>
@@ -369,6 +369,6 @@
     </article>
   </template>
 
-  <script src="app.js?v=20260603-reports"></script>
+  <script src="app.js?v=20260617-category-list-filter"></script>
 </body>
 </html>
