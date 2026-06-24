@@ -86,14 +86,45 @@ def init_db():
     with connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "CREATE TABLE IF NOT EXISTS app_state (id INT PRIMARY KEY CHECK (id = 1), data TEXT NOT NULL)"
-            )
-            cur.execute(
                 "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT, email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, salt TEXT NOT NULL)"
             )
             cur.execute(
                 "CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at INTEGER NOT NULL)"
             )
+            
+            # Migrate app_state table if it uses the old global format
+            cur.execute("""
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = 'app_state' AND column_name = 'user_id'
+            """)
+            if not cur.fetchone():
+                cur.execute("DROP TABLE IF EXISTS app_state")
+
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS app_state (user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, data TEXT NOT NULL)"
+            )
+
+            # Ensure app_state has a primary key on user_id to match ON CONFLICT spec
+            cur.execute("""
+                SELECT 1 FROM information_schema.table_constraints 
+                WHERE table_name = 'app_state' AND constraint_type = 'PRIMARY KEY'
+            """)
+            if not cur.fetchone():
+                try:
+                    cur.execute("""
+                        DELETE FROM app_state a 
+                        WHERE a.ctid <> (
+                            SELECT min(b.ctid) 
+                            FROM app_state b 
+                            WHERE a.user_id = b.user_id
+                        )
+                    """)
+                    cur.execute("ALTER TABLE app_state ADD PRIMARY KEY (user_id)")
+                except Exception:
+                    cur.execute("DROP TABLE IF EXISTS app_state")
+                    cur.execute(
+                        "CREATE TABLE IF NOT EXISTS app_state (user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, data TEXT NOT NULL)"
+                    )
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS categories (
                     id SERIAL PRIMARY KEY,
@@ -128,6 +159,10 @@ def init_db():
                 WHERE t.category_id = c.id
                   AND (t.category_name IS NULL OR t.category_name = '')
             """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_categories_user_id ON categories(user_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_transactions_state_id ON transactions(state_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_transactions_category_id ON transactions(category_id)")
         conn.commit()
 
 
@@ -238,46 +273,51 @@ def create_category(user_id, name, category_type, amount=0):
 
     return category_id
 
-def get_or_create_category(user_id, name, category_type, amount=None):
+def get_or_create_category(user_id, name, category_type, amount=None, conn=None):
     name = (name or "").strip()
     category_type = normalize_category_type(category_type)
     if not name:
         raise ValueError("Category name is required")
 
-    with WRITE_LOCK:
-        with connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT id FROM categories
-                    WHERE user_id = %s AND lower(name) = lower(%s) AND type = %s
-                    ORDER BY id
-                    LIMIT 1
-                    """,
-                    (user_id, name, category_type),
-                )
-                row = cur.fetchone()
-                if row:
-                    if amount is not None:
-                        cur.execute(
-                            "UPDATE categories SET amount = %s WHERE id = %s",
-                            (amount or 0, row[0]),
-                        )
-                        conn.commit()
-                    return row[0]
+    def execute_query(connection):
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id FROM categories
+                WHERE user_id = %s AND lower(name) = lower(%s) AND type = %s
+                ORDER BY id
+                LIMIT 1
+                """,
+                (user_id, name, category_type),
+            )
+            row = cur.fetchone()
+            if row:
+                if amount is not None:
+                    cur.execute(
+                        "UPDATE categories SET amount = %s WHERE id = %s",
+                        (amount or 0, row[0]),
+                    )
+                return row[0]
 
-                cur.execute(
-                    """
-                    INSERT INTO categories
-                    (user_id, name, type, amount)
-                    VALUES (%s, %s, %s, %s)
-                    RETURNING id
-                    """,
-                    (user_id, name, category_type, amount or 0),
-                )
-                category_id = cur.fetchone()[0]
-                conn.commit()
-                return category_id
+            cur.execute(
+                """
+                INSERT INTO categories
+                (user_id, name, type, amount)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id
+                """,
+                (user_id, name, category_type, amount or 0),
+            )
+            return cur.fetchone()[0]
+
+    if conn:
+        return execute_query(conn)
+
+    with WRITE_LOCK:
+        with connect() as conn_new:
+            res = execute_query(conn_new)
+            conn_new.commit()
+            return res
 
 def create_transaction(user_id, category_id, tx_type,
                        amount, note, transaction_date, state_id=None):
@@ -306,93 +346,97 @@ def create_transaction(user_id, category_id, tx_type,
 
 
 def get_or_create_transaction(user_id, category_name, tx_type,
-                              amount, note, transaction_date, state_id=None):
+                              amount, note, transaction_date, state_id=None, conn=None):
     tx_type = normalize_category_type(tx_type)
     note = note or ""
     category_name = (category_name or "").strip()
-    category_id = get_or_create_category(user_id, category_name, tx_type)
 
-    with WRITE_LOCK:
-        with connect() as conn:
-            with conn.cursor() as cur:
-                if state_id:
-                    cur.execute(
-                        """
-                        SELECT id FROM transactions
-                        WHERE user_id = %s
-                          AND state_id = %s
-                        LIMIT 1
-                        """,
-                        (user_id, state_id),
-                    )
-                    row = cur.fetchone()
-                    if row:
-                        cur.execute(
-                            """
-                            UPDATE transactions
-                            SET category_id = %s,
-                                category_name = %s,
-                                type = %s,
-                                amount = %s,
-                                note = %s,
-                                transaction_date = %s
-                            WHERE id = %s
-                            """,
-                            (
-                                category_id,
-                                category_name,
-                                tx_type,
-                                amount,
-                                note,
-                                transaction_date,
-                                row[0],
-                            ),
-                        )
-                        conn.commit()
-                        return row[0], category_id
-
+    def execute_query(connection):
+        category_id = get_or_create_category(user_id, category_name, tx_type, conn=connection)
+        with connection.cursor() as cur:
+            if state_id:
                 cur.execute(
                     """
-                    SELECT id, state_id FROM transactions
+                    SELECT id FROM transactions
                     WHERE user_id = %s
-                      AND category_id = %s
-                      AND type = %s
-                      AND amount = %s
-                      AND COALESCE(note, '') = %s
-                      AND transaction_date = %s
-                    ORDER BY id
+                      AND state_id = %s
                     LIMIT 1
                     """,
-                    (user_id, category_id, tx_type, amount, note, transaction_date),
+                    (user_id, state_id),
                 )
                 row = cur.fetchone()
                 if row:
-                    existing_id, existing_state_id = row
-                    if state_id and existing_state_id != state_id:
-                        cur.execute(
-                            "UPDATE transactions SET state_id = %s, category_name = %s WHERE id = %s",
-                            (state_id, category_name, existing_id),
-                        )
-                    elif category_name:
-                        cur.execute(
-                            "UPDATE transactions SET category_name = %s WHERE id = %s",
-                            (category_name, existing_id),
-                        )
-                    conn.commit()
-                    return existing_id, category_id
+                    cur.execute(
+                        """
+                        UPDATE transactions
+                        SET category_id = %s,
+                            category_name = %s,
+                            type = %s,
+                            amount = %s,
+                            note = %s,
+                            transaction_date = %s
+                        WHERE id = %s
+                        """,
+                        (
+                            category_id,
+                            category_name,
+                            tx_type,
+                            amount,
+                            note,
+                            transaction_date,
+                            row[0],
+                        ),
+                    )
+                    return row[0], category_id
 
-                cur.execute(
-                    """
-                    INSERT INTO transactions
-                    (user_id, category_id, category_name, type, amount, note, transaction_date, state_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id
-                    """,
-                    (user_id, category_id, category_name, tx_type, amount, note, transaction_date, state_id),
-                )
-                transaction_id = cur.fetchone()[0]
-                conn.commit()
-                return transaction_id, category_id
+            cur.execute(
+                """
+                SELECT id, state_id FROM transactions
+                WHERE user_id = %s
+                  AND category_id = %s
+                  AND type = %s
+                  AND amount = %s
+                  AND COALESCE(note, '') = %s
+                  AND transaction_date = %s
+                ORDER BY id
+                LIMIT 1
+                """,
+                (user_id, category_id, tx_type, amount, note, transaction_date),
+            )
+            row = cur.fetchone()
+            if row:
+                existing_id, existing_state_id = row
+                if state_id and existing_state_id != state_id:
+                    cur.execute(
+                        "UPDATE transactions SET state_id = %s, category_name = %s WHERE id = %s",
+                        (state_id, category_name, existing_id),
+                    )
+                elif category_name:
+                    cur.execute(
+                        "UPDATE transactions SET category_name = %s WHERE id = %s",
+                        (category_name, existing_id),
+                    )
+                return existing_id, category_id
+
+            cur.execute(
+                """
+                INSERT INTO transactions
+                (user_id, category_id, category_name, type, amount, note, transaction_date, state_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (user_id, category_id, category_name, tx_type, amount, note, transaction_date, state_id),
+            )
+            return cur.fetchone()[0], category_id
+
+    if conn:
+        return execute_query(conn)
+
+    with WRITE_LOCK:
+        with connect() as conn_new:
+            res = execute_query(conn_new)
+            conn_new.commit()
+            return res
 
 def get_categories(user_id):
     with connect() as conn:
@@ -417,30 +461,37 @@ def get_categories(user_id):
     return categories
 
 
-def reconcile_transactions(user_id, state_transactions):
+def reconcile_transactions(user_id, state_transactions, conn=None):
     state_ids = [
         tx.get("id") for tx in (state_transactions or [])
         if isinstance(tx.get("id"), str) and tx.get("id")
     ]
 
-    with WRITE_LOCK:
-        with connect() as conn:
-            with conn.cursor() as cur:
-                if state_ids:
-                    cur.execute(
-                        "DELETE FROM transactions WHERE user_id = %s AND state_id IS NOT NULL AND state_id NOT IN %s",
-                        (user_id, tuple(state_ids)),
-                    )
-                else:
-                    cur.execute(
-                        "DELETE FROM transactions WHERE user_id = %s AND state_id IS NOT NULL",
-                        (user_id,),
-                    )
+    def execute_query(connection):
+        with connection.cursor() as cur:
+            if state_ids:
                 cur.execute(
-                    "DELETE FROM transactions WHERE user_id = %s AND state_id IS NULL",
+                    "DELETE FROM transactions WHERE user_id = %s AND state_id IS NOT NULL AND NOT (state_id = ANY(%s))",
+                    (user_id, state_ids),
+                )
+            else:
+                cur.execute(
+                    "DELETE FROM transactions WHERE user_id = %s AND state_id IS NOT NULL",
                     (user_id,),
                 )
-                conn.commit()
+            cur.execute(
+                "DELETE FROM transactions WHERE user_id = %s AND state_id IS NULL",
+                (user_id,),
+            )
+
+    if conn:
+        execute_query(conn)
+        return
+
+    with WRITE_LOCK:
+        with connect() as conn_new:
+            execute_query(conn_new)
+            conn_new.commit()
 
 
 def delete_transaction_by_state_id(user_id, state_id):
@@ -604,10 +655,10 @@ def update_transaction(user_id, state_id, previous_tx, updated_tx):
     )
 
 
-def read_state():
+def read_state(user_id):
     with connect() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT data FROM app_state WHERE id = 1")
+            cur.execute("SELECT data FROM app_state WHERE user_id = %s", (user_id,))
             row = cur.fetchone()
 
     if not row:
@@ -623,15 +674,15 @@ def read_state():
     return json.loads(data)
 
 
-def write_state(data):
+def write_state(user_id, data):
     payload = json.dumps(data)
     with WRITE_LOCK:
         with connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO app_state (id, data) VALUES (1, %s) "
-                    "ON CONFLICT (id) DO UPDATE SET data = excluded.data",
-                    (payload,),
+                    "INSERT INTO app_state (user_id, data) VALUES (%s, %s) "
+                    "ON CONFLICT (user_id) DO UPDATE SET data = excluded.data",
+                    (user_id, payload),
                 )
                 conn.commit()
 
@@ -656,13 +707,16 @@ class BudgetHandler(SimpleHTTPRequestHandler):
             self.send_json({"error": "Not authenticated"}, status=401)
             return None
         return user
-
+        
     def do_GET(self):
         path = urlparse(self.path).path
         if path == "/api/state":
-            self.send_json({"state": read_state()})
+            user = self.require_user()
+            if not user:
+                return
+            self.send_json({"state": read_state(user["id"])})
             return
-
+        
         if path == "/api/auth/me":
             user = self.current_user()
             if not user:
@@ -873,12 +927,14 @@ class BudgetHandler(SimpleHTTPRequestHandler):
             length = int(self.headers.get("content-length", "0"))
             body = self.rfile.read(length).decode("utf-8") if length else ""
             payload = json.loads(body) if body else {}
-
             if path == "/api/state":
-                write_state(payload.get("state"))
+                user = self.current_user()
+                if not user:
+                    self.send_json({"error": "Not authenticated"}, status=401)
+                    return
+                write_state(user["id"], payload.get("state"))
                 self.send_json({"ok": True})
                 return
-
             if path == "/api/auth/register":
                 name = payload.get("name", "").strip()
                 email = payload.get("email", "").strip().lower()
@@ -1023,48 +1079,212 @@ class BudgetHandler(SimpleHTTPRequestHandler):
                 category_count = 0
                 transaction_count = 0
 
-                for plan in plans.values():
-                    for budget in plan.get("budgets") or []:
-                        name = str(budget.get("name") or "").strip()
-                        if name:
-                            get_or_create_category(
-                                user["id"],
-                                name,
-                                "expense",
-                                amount=budget.get("amount")
+                with WRITE_LOCK:
+                    with connect() as conn:
+                        with conn.cursor() as cur:
+                            # 1. Fetch and cache all categories for the user
+                            cur.execute(
+                                "SELECT id, name, type, amount FROM categories WHERE user_id = %s",
+                                (user["id"],)
                             )
-                            category_count += 1
+                            db_categories = cur.fetchall()
+                            cat_cache = {
+                                (cat[1].lower(), cat[2].lower()): (cat[0], cat[3])
+                                for cat in db_categories
+                            }
 
-                    for income in plan.get("incomes") or []:
-                        description = str(income.get("description") or "").strip()
-                        if description:
-                            get_or_create_category(
-                                user["id"],
-                                description,
-                                "income",
-                                amount=income.get("amount")
+                            # Keep track of categories processed during this sync
+                            processed_categories = {}
+
+                            for plan in plans.values():
+                                for budget in plan.get("budgets") or []:
+                                    name = str(budget.get("name") or "").strip()
+                                    if not name:
+                                        continue
+                                    key = (name.lower(), "expense")
+                                    amount = budget.get("amount") or 0
+
+                                    if key in processed_categories:
+                                        continue
+
+                                    if key in cat_cache:
+                                        cat_id, cat_amount = cat_cache[key]
+                                        if cat_amount is None or float(cat_amount) != float(amount):
+                                            cur.execute(
+                                                "UPDATE categories SET amount = %s WHERE id = %s",
+                                                (amount, cat_id)
+                                            )
+                                        processed_categories[key] = cat_id
+                                    else:
+                                        cur.execute(
+                                            """
+                                            INSERT INTO categories (user_id, name, type, amount)
+                                            VALUES (%s, %s, %s, %s)
+                                            RETURNING id
+                                            """,
+                                            (user["id"], name, "expense", amount)
+                                        )
+                                        cat_id = cur.fetchone()[0]
+                                        cat_cache[key] = (cat_id, amount)
+                                        processed_categories[key] = cat_id
+                                    category_count += 1
+
+                                for income in plan.get("incomes") or []:
+                                    description = str(income.get("description") or "").strip()
+                                    if not description:
+                                        continue
+                                    key = (description.lower(), "income")
+                                    amount = income.get("amount") or 0
+
+                                    if key in processed_categories:
+                                        continue
+
+                                    if key in cat_cache:
+                                        cat_id, cat_amount = cat_cache[key]
+                                        if cat_amount is None or float(cat_amount) != float(amount):
+                                            cur.execute(
+                                                "UPDATE categories SET amount = %s WHERE id = %s",
+                                                (amount, cat_id)
+                                            )
+                                        processed_categories[key] = cat_id
+                                    else:
+                                        cur.execute(
+                                            """
+                                            INSERT INTO categories (user_id, name, type, amount)
+                                            VALUES (%s, %s, %s, %s)
+                                            RETURNING id
+                                            """,
+                                            (user["id"], description, "income", amount)
+                                        )
+                                        cat_id = cur.fetchone()[0]
+                                        cat_cache[key] = (cat_id, amount)
+                                        processed_categories[key] = cat_id
+                                    category_count += 1
+
+                            # Reconcile categories (delete categories not in plans)
+                            to_delete = []
+                            for key, (cat_id, _) in cat_cache.items():
+                                if key not in processed_categories:
+                                    to_delete.append(cat_id)
+                            if to_delete:
+                                cur.execute("DELETE FROM categories WHERE id = ANY(%s)", (to_delete,))
+
+                            # 2. Fetch and cache all transactions for the user
+                            cur.execute(
+                                """
+                                SELECT id, state_id, category_id, type, amount, note, transaction_date 
+                                FROM transactions 
+                                WHERE user_id = %s
+                                """,
+                                (user["id"],)
                             )
-                            category_count += 1
+                            db_transactions = cur.fetchall()
+                            tx_by_state = {
+                                tx[1]: tx for tx in db_transactions if tx[1]
+                            }
+                            tx_by_details = {
+                                (tx[2], tx[3].lower(), float(tx[4]), tx[5] or "", tx[6].isoformat() if tx[6] else None): tx[0]
+                                for tx in db_transactions
+                            }
 
-                for tx in transactions:
-                    category = str(tx.get("category") or "").strip()
-                    amount = tx.get("amount")
-                    transaction_date = tx.get("date") or tx.get("transaction_date")
-                    if not category or amount is None or not transaction_date:
-                        continue
+                            processed_tx_ids = []
 
-                    get_or_create_transaction(
-                        user["id"],
-                        category,
-                        tx.get("type", "expense"),
-                        amount,
-                        tx.get("note", ""),
-                        transaction_date,
-                        state_id=tx.get("id")
-                    )
-                    transaction_count += 1
+                            for tx in transactions:
+                                category_name = str(tx.get("category") or "").strip()
+                                amount = tx.get("amount")
+                                transaction_date = tx.get("date") or tx.get("transaction_date")
+                                if not category_name or amount is None or not transaction_date:
+                                    continue
 
-                reconcile_transactions(user["id"], transactions)
+                                tx_type = normalize_category_type(tx.get("type", "expense"))
+                                note = tx.get("note") or ""
+                                state_id = tx.get("id")
+
+                                # Resolve category_id from cache
+                                cat_key = (category_name.lower(), tx_type)
+                                if cat_key in processed_categories:
+                                    category_id = processed_categories[cat_key]
+                                elif cat_key in cat_cache:
+                                    category_id = cat_cache[cat_key][0]
+                                else:
+                                    # Create category if missing
+                                    cur.execute(
+                                        """
+                                        INSERT INTO categories (user_id, name, type, amount)
+                                        VALUES (%s, %s, %s, %s)
+                                        RETURNING id
+                                        """,
+                                        (user["id"], category_name, tx_type, 0)
+                                    )
+                                    category_id = cur.fetchone()[0]
+                                    cat_cache[cat_key] = (category_id, 0)
+                                    processed_categories[cat_key] = category_id
+
+                                existing_tx_id = None
+                                needs_update = False
+
+                                if state_id and state_id in tx_by_state:
+                                    db_tx = tx_by_state[state_id]
+                                    existing_tx_id = db_tx[0]
+                                    if (db_tx[2] != category_id or 
+                                        db_tx[3].lower() != tx_type or 
+                                        float(db_tx[4]) != float(amount) or 
+                                        (db_tx[5] or "") != note or 
+                                        (db_tx[6].isoformat() if db_tx[6] else None) != transaction_date):
+                                        needs_update = True
+                                else:
+                                    details_key = (category_id, tx_type, float(amount), note, transaction_date)
+                                    if details_key in tx_by_details:
+                                        existing_tx_id = tx_by_details[details_key]
+                                        if state_id:
+                                            cur.execute(
+                                                "UPDATE transactions SET state_id = %s, category_name = %s WHERE id = %s",
+                                                (state_id, category_name, existing_tx_id)
+                                            )
+
+                                if existing_tx_id:
+                                    if needs_update:
+                                        cur.execute(
+                                            """
+                                            UPDATE transactions
+                                            SET category_id = %s,
+                                                category_name = %s,
+                                                type = %s,
+                                                amount = %s,
+                                                note = %s,
+                                                transaction_date = %s
+                                            WHERE id = %s
+                                            """,
+                                            (category_id, category_name, tx_type, amount, note, transaction_date, existing_tx_id)
+                                        )
+                                    processed_tx_ids.append(existing_tx_id)
+                                else:
+                                    cur.execute(
+                                        """
+                                        INSERT INTO transactions
+                                        (user_id, category_id, category_name, type, amount, note, transaction_date, state_id)
+                                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                                        RETURNING id
+                                        """,
+                                        (user["id"], category_id, category_name, tx_type, amount, note, transaction_date, state_id)
+                                    )
+                                    new_tx_id = cur.fetchone()[0]
+                                    processed_tx_ids.append(new_tx_id)
+
+                                transaction_count += 1
+
+                            # Reconcile transactions (delete transactions not in processed_tx_ids)
+                            if processed_tx_ids:
+                                cur.execute(
+                                    "DELETE FROM transactions WHERE user_id = %s AND NOT (id = ANY(%s))",
+                                    (user["id"], processed_tx_ids)
+                                )
+                            else:
+                                cur.execute(
+                                    "DELETE FROM transactions WHERE user_id = %s",
+                                    (user["id"],)
+                                )
+                            conn.commit()
 
                 self.send_json({
                     "ok": True,

@@ -526,6 +526,16 @@ async function loadState() {
 
     try {
       dbTransactions = await loadTransactions();
+
+      state.transactions = dbTransactions.map(tx => ({
+      id: tx.id,
+      type: tx.type,
+      category: tx.category,
+      amount: Number(tx.amount),
+      date: tx.transaction_date,
+      note: tx.note || ""
+  }));
+      
     } catch (e) {
       console.error("Transaction load failed", e);
       dbTransactions = [];
@@ -575,7 +585,7 @@ async function syncStateToDatabase() {
   }
 }
 
-async function saveState() {
+async function saveState(skipSync = false) {
   // Snapshot current state so we can roll back on failure
   const prevState = JSON.parse(JSON.stringify(state || {}));
   try {
@@ -597,10 +607,12 @@ async function saveState() {
       try { render(); } catch (e) { /* ignore render errors during rollback */ }
       throw new Error(`Unable to save database state${details}`);
     }
-    try {
-      await syncStateToDatabase();
-    } catch (syncError) {
-      console.warn("PostgreSQL table sync failed; app state was saved", syncError);
+    if (!skipSync) {
+      try {
+        await syncStateToDatabase();
+      } catch (syncError) {
+        console.warn("PostgreSQL table sync failed; app state was saved", syncError);
+      }
     }
   } catch (err) {
     // on network/other errors, restore previous state and re-render
@@ -644,6 +656,26 @@ function normalizeState() {
       const amount = Number(plan.income) || 0;
       plan.budgets = amount ? [{ id: crypto.randomUUID(), name: "Monthly Budget", amount }] : [];
     }
+    if (Array.isArray(state.categories) && state.categories.length > 0) {
+      if (plan.budgets.length === 0) {
+        plan.budgets = state.categories
+          .filter(c => c.type === "expense")
+          .map(c => ({
+            id: c.id,
+            name: c.name,
+            amount: Number(c.amount) || 0
+          }));
+      }
+      if (plan.incomes.length === 0) {
+        plan.incomes = state.categories
+          .filter(c => c.type === "income")
+          .map(c => ({
+            id: c.id,
+            description: c.name,
+            amount: Number(c.amount) || 0
+          }));
+      }
+    }
   }
 }
 
@@ -678,6 +710,23 @@ function getPlan() {
       incomes: [],
       budgets: []
     };
+    const plan = state.plans[state.selectedMonth];
+    if (Array.isArray(state.categories) && state.categories.length > 0) {
+      plan.budgets = state.categories
+        .filter(c => c.type === "expense")
+        .map(c => ({
+          id: c.id,
+          name: c.name,
+          amount: Number(c.amount) || 0
+        }));
+      plan.incomes = state.categories
+        .filter(c => c.type === "income")
+        .map(c => ({
+          id: c.id,
+          description: c.name,
+          amount: Number(c.amount) || 0
+        }));
+    }
   }
 
   if (!Array.isArray(state.plans[state.selectedMonth].incomes)) {
@@ -1019,7 +1068,7 @@ function renderCategorySuggestions() {
 
 function startBudgetEdit(budgetId) {
   const plan = getPlan();
-  const budget = plan.budgets.find((item) => item.id === budgetId);
+  const budget = plan.budgets.find((item) => item.id == budgetId);
   if (!budget) return;
   editingBudgetId = budgetId;
   els.budgetNameInput.value = budget.name;
@@ -1037,7 +1086,7 @@ function resetBudgetEdit() {
 }
 
 function startTransactionEdit(transactionId) {
-  const transaction = state.transactions.find((item) => item.id === transactionId);
+  const transaction = state.transactions.find((item) => item.id == transactionId);
   if (!transaction) return;
   editingTransactionId = transactionId;
   els.typeInput.value = transaction.type;
@@ -1551,7 +1600,7 @@ els.monthSelect.addEventListener("change", async () => {
   state.selectedMonth = els.monthSelect.value || currentMonth();
   els.dateInput.value = defaultDateForSelectedMonth();
   try {
-    await saveState();
+    await saveState(true);
     render();
   } catch (error) {
     reportError(error);
@@ -1583,7 +1632,17 @@ els.incomeTable.addEventListener("click", async (event) => {
   const button = event.target.closest("button[data-income-id]");
   if (!button) return;
   const plan = getPlan();
-  plan.incomes = plan.incomes.filter((item) => item.id !== button.dataset.incomeId);
+  const deletedIncome = plan.incomes.find((item) => item.id == button.getAttribute("data-income-id"));
+  plan.incomes = plan.incomes.filter((item) => item.id != button.getAttribute("data-income-id"));
+  if (deletedIncome) {
+    const name = deletedIncome.description.trim();
+    state.savedIncomeDescriptions = (state.savedIncomeDescriptions || []).filter(
+      (val) => val.toLowerCase() !== name.toLowerCase()
+    );
+    state.transactions = state.transactions.filter(
+      (tx) => tx.type !== "income" || tx.category.toLowerCase() !== name.toLowerCase()
+    );
+  }
   clearMoneyIfMonthIsEmpty();
   try {
     await saveState();
@@ -1604,7 +1663,7 @@ els.budgetForm.addEventListener("submit", async (event) => {
   }
 
   if (editingBudgetId) {
-    const existing = plan.budgets.find((item) => item.id === editingBudgetId);
+    const existing = plan.budgets.find((item) => item.id == editingBudgetId);
     if (existing) {
       existing.name = name;
       existing.amount = amount;
@@ -1742,14 +1801,24 @@ els.categorySuggestionList?.addEventListener("click", async (event) => {
 els.budgetTable.addEventListener("click", async (event) => {
   const editButton = event.target.closest("button[data-budget-edit-id]");
   if (editButton) {
-    startBudgetEdit(editButton.dataset.budgetEditId);
+    startBudgetEdit(editButton.getAttribute("data-budget-edit-id"));
     return;
   }
 
   const deleteButton = event.target.closest("button[data-budget-id]");
   if (!deleteButton) return;
   const plan = getPlan();
-  plan.budgets = plan.budgets.filter((item) => item.id !== deleteButton.dataset.budgetId);
+  const deletedBudget = plan.budgets.find((item) => item.id == deleteButton.getAttribute("data-budget-id"));
+  plan.budgets = plan.budgets.filter((item) => item.id != deleteButton.getAttribute("data-budget-id"));
+  if (deletedBudget) {
+    const name = deletedBudget.name.trim();
+    state.savedBudgetNames = (state.savedBudgetNames || []).filter(
+      (val) => val.toLowerCase() !== name.toLowerCase()
+    );
+    state.transactions = state.transactions.filter(
+      (tx) => tx.type !== "expense" || tx.category.toLowerCase() !== name.toLowerCase()
+    );
+  }
   clearMoneyIfMonthIsEmpty();
   try {
     await saveState();
@@ -1796,7 +1865,7 @@ async function saveComparisonSelection() {
   state.compareBaseMonth = els.compareBaseMonth.value;
   state.compareTargetMonth = els.compareTargetMonth.value;
   try {
-    await saveState();
+    await saveState(true);
     render();
   } catch (error) {
     reportError(error);
@@ -1830,7 +1899,7 @@ els.transactionForm.addEventListener("submit", async (event) => {
   };
 
   if (editingTransactionId) {
-    const existingIndex = state.transactions.findIndex((item) => item.id === editingTransactionId);
+    const existingIndex = state.transactions.findIndex((item) => item.id == editingTransactionId);
     const previousTransaction = existingIndex >= 0
       ? { ...state.transactions[existingIndex] }
       : null;
@@ -1853,7 +1922,7 @@ els.transactionForm.addEventListener("submit", async (event) => {
     try {
       await createTransactionOnServer(transaction);
     } catch (error) {
-      state.transactions = state.transactions.filter((item) => item.id !== transaction.id);
+      state.transactions = state.transactions.filter((item) => item.id != transaction.id);
       reportError(error);
       return;
     }
@@ -1868,7 +1937,7 @@ els.transactionForm.addEventListener("submit", async (event) => {
   els.monthSelect.value = state.selectedMonth;
   els.dateInput.value = defaultDateForSelectedMonth();
   try {
-    await saveState();
+    await saveState(true);
     resetTransactionEdit();
     render();
   } catch (error) {
@@ -1879,7 +1948,7 @@ els.transactionForm.addEventListener("submit", async (event) => {
 els.transactionTable.addEventListener("click", async (event) => {
   const editButton = event.target.closest("button[data-transaction-id]");
   if (editButton) {
-    startTransactionEdit(editButton.dataset.transactionId);
+    startTransactionEdit(editButton.getAttribute("data-transaction-id"));
     return;
   }
 
@@ -1890,17 +1959,17 @@ els.transactionTable.addEventListener("click", async (event) => {
     return;
   }
 
-  const transactionId = deleteButton.dataset.id;
+  const transactionId = deleteButton.getAttribute("data-id");
   const prevState = JSON.parse(JSON.stringify(state));
-  const transaction = state.transactions.find((item) => item.id === transactionId);
-  state.transactions = state.transactions.filter((item) => item.id !== transactionId);
+  const transaction = state.transactions.find((item) => item.id == transactionId);
+  state.transactions = state.transactions.filter((item) => item.id != transactionId);
   clearMoneyIfMonthIsEmpty();
 
   try {
     if (transaction) {
       await deleteTransactionFromServer(transaction);
     }
-    await saveState();
+    await saveState(true);
     render();
   } catch (error) {
     state = prevState;
@@ -1939,7 +2008,7 @@ els.goalForm.addEventListener("submit", async (event) => {
   });
   els.goalForm.reset();
   try {
-    await saveState();
+    await saveState(true);
     render();
   } catch (error) {
     reportError(error);
@@ -1949,9 +2018,9 @@ els.goalForm.addEventListener("submit", async (event) => {
 els.goalsList.addEventListener("click", async (event) => {
   const button = event.target.closest("button[data-id]");
   if (!button) return;
-  state.goals = state.goals.filter((goal) => goal.id !== button.dataset.id);
+  state.goals = state.goals.filter((goal) => goal.id != button.getAttribute("data-id"));
   try {
-    await saveState();
+    await saveState(true);
     render();
   } catch (error) {
     reportError(error);
