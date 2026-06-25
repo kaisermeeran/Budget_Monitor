@@ -79,6 +79,7 @@
       <nav class="view-tabs" aria-label="Views">
         <button class="tab-button active" data-view="overview" type="button">Overview</button>
         <button class="tab-button" data-view="transactions" type="button">Transactions</button>
+        <button class="tab-button" data-view="emiPlanner" type="button">EMI Planner</button>
         <button class="tab-button" data-view="reports" type="button">Reports</button>
         <button class="tab-button" data-view="goals" type="button">Goals</button>
       </nav>
@@ -277,9 +278,12 @@
                 <option value="income">Income</option>
               </select>
             </label>
-            <label>
-              Category
-              <select id="transactionCategory"></select>
+            <label class="budget-name-row">
+              <span>Category</span>
+              <div class="budget-name-input-row">
+                <input id="transactionCategory" type="text" placeholder="e.g. Groceries" autocomplete="off" required>
+                <div id="categorySuggestionList" class="budget-suggestion-list" hidden></div>
+              </div>
             </label>
             <label>
               Amount
@@ -352,6 +356,335 @@
         </section>
         <section id="goalsList" class="goals-list"></section>
         <p id="emptyGoals" class="empty-state">No savings goals added yet.</p>
+      </section>
+
+      <section id="emiPlannerView" class="view" aria-label="EMI Planner">
+        <div id="emiPlannerAlerts" class="alert-banner" aria-live="polite" style="margin-bottom: 24px;" hidden></div>
+        <div class="emi-planner-layout">
+          
+          <!-- 1. EMI Planner - Dashboard -->
+          <section class="panel">
+            <div class="panel-header">
+              <h3>1. EMI Planner - Dashboard</h3>
+            </div>
+            
+            <div style="margin-bottom: 12px; font-weight: 700; color: var(--ink);">EMI Overview</div>
+            <div class="emi-dashboard-grid">
+              <div class="emi-overview-card">
+                <span>Active EMI</span>
+                <strong id="emiActiveCount">0</strong>
+              </div>
+              <div class="emi-overview-card">
+                <span>Total Monthly EMI</span>
+                <strong id="emiMonthlyCommitment">₹0</strong>
+              </div>
+              <div class="emi-overview-card">
+                <span>Total Remaining</span>
+                <strong id="emiTotalRemaining">₹0</strong>
+              </div>
+              <div class="emi-overview-card">
+                <span>Paid Till Now</span>
+                <strong id="emiPaidTillNow">₹0</strong>
+              </div>
+            </div>
+            
+            <div class="emi-upcoming-box" id="emiUpcomingBox">
+              <div class="emi-upcoming-info">
+                <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--gold); display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+                  📅 Upcoming EMI
+                </span>
+                <h4 id="emiUpcomingName">No Upcoming EMI</h4>
+                <p><strong id="emiUpcomingAmount">₹0</strong> is due on <span id="emiUpcomingDate" style="color: var(--red); font-weight: 700;">-</span></p>
+              </div>
+              <button class="primary-button" id="emiUpcomingMarkPaidBtn" type="button" style="min-height: 36px; padding: 0 12px; background: var(--green);">Mark as Paid</button>
+            </div>
+            
+            <div class="emi-summary-box">
+              <div class="donut-chart-container" style="position: relative; display: inline-block; width: 80px; height: 80px; flex-shrink: 0;">
+                <svg width="80" height="80" viewBox="0 0 36 36">
+                  <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="#e8eee9" stroke-width="4"></circle>
+                  <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="var(--green)" stroke-width="4" stroke-dasharray="33.33 66.67" stroke-dashoffset="25"></circle>
+                </svg>
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 13px; font-weight: 800; color: var(--ink);">33.3%</div>
+              </div>
+              <div class="emi-summary-legend">
+                <div style="font-weight: 700; font-size: 13px; margin-bottom: 4px;">EMI Summary</div>
+                <div class="legend-item">
+                  <div class="legend-color paid"></div>
+                  <span>Paid EMI: <strong>12 (33.33%)</strong></span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color remaining" style="background-color: #cfd8d0;"></div>
+                  <span>Remaining EMI: <strong>24 (66.67%)</strong></span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 2. Add EMI Plan -->
+          <section class="panel">
+            <div class="panel-header">
+              <h3>2. Add EMI Plan</h3>
+            </div>
+            <div style="margin-bottom: 12px; font-weight: 700; color: var(--ink);">Add New EMI Plan</div>
+            <form id="emiPlannerForm" class="balance-form">
+              <div class="form-grid-2">
+                <label>
+                  EMI Name *
+                  <input type="text" id="emiNameInput" placeholder="e.g. Bike Loan" required>
+                </label>
+                <label>
+                  Loan Amount *
+                  <input type="number" id="emiLoanAmountInput" placeholder="e.g. 120000" required>
+                </label>
+              </div>
+              <div class="form-grid-2">
+                <label>
+                  EMI Amount *
+                  <input type="number" id="emiAmountInput" placeholder="e.g. 4000" required>
+                </label>
+                <label>
+                  Start Date *
+                  <input type="date" id="emiStartDateInput" required>
+                </label>
+              </div>
+              <div class="form-grid-2">
+                <label>
+                  Due Day *
+                  <input type="number" id="emiDueDayInput" value="5" min="1" max="31" required>
+                </label>
+                <label>
+                  Total Months *
+                  <input type="number" id="emiTotalMonthsInput" placeholder="e.g. 36" required>
+                </label>
+              </div>
+              <label>
+                Notes
+                <input type="text" id="emiNotesInput" placeholder="e.g. Personal Bike Loan">
+              </label>
+              <input type="hidden" id="emiEditingId" value="">
+              <div class="form-actions">
+                <button type="submit" id="emiSaveBtn" class="primary-button">Save EMI Plan</button>
+                <button type="button" id="emiCancelBtn" class="ghost-button" style="display: none;">Cancel</button>
+                <button type="reset" id="emiResetBtn" class="ghost-button">Reset</button>
+              </div>
+            </form>
+          </section>
+
+          <!-- 3. EMI Planner List -->
+          <section class="panel" style="grid-column: span 2;">
+            <div class="panel-header">
+              <h3>3. EMI Planner List</h3>
+              <button class="primary-button" id="addEmiScrollBtn" type="button" style="min-height: 36px; padding: 0 12px;">+ Add New EMI</button>
+            </div>
+            <div style="margin-bottom: 12px; font-weight: 700; color: var(--ink);">Active EMI Plans</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>EMI Name</th>
+                    <th>EMI Amount</th>
+                    <th>Total Months</th>
+                    <th>Paid Months</th>
+                    <th>Remaining</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="emiPlannerListBody">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- 4. EMI Payment Schedule -->
+          <section class="panel" style="grid-column: span 2;">
+            <div class="panel-header">
+              <h3>4. EMI Payment Schedule</h3>
+            </div>
+            <div style="margin-bottom: 12px; font-weight: 700; color: var(--ink);" id="emiScheduleTitle">-</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Due Date</th>
+                    <th>EMI Amount</th>
+                    <th>Status</th>
+                    <th>Paid Date</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="emiScheduleTableBody">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- 5. Mark EMI as Paid -->
+          <section class="panel" id="emiConfirmPaymentPanel" style="display: none;">
+            <div class="panel-header">
+              <h3>5. Mark EMI as Paid</h3>
+            </div>
+            <div style="margin-bottom: 12px; font-weight: 700; color: var(--ink);">Confirm Payment</div>
+            <div style="display: flex; justify-content: space-between; background: #f8faf7; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--line); margin-bottom: 16px;">
+              <div>
+                <span style="font-size: 11px; color: var(--muted); display: block; font-weight: 700;">EMI NAME</span>
+                <strong id="emiConfirmName" style="font-size: 14px; color: var(--ink);">-</strong>
+              </div>
+              <div>
+                <span style="font-size: 11px; color: var(--muted); display: block; font-weight: 700;">DUE DATE</span>
+                <strong id="emiConfirmDate" style="font-size: 14px; color: var(--ink);">-</strong>
+              </div>
+              <div>
+                <span style="font-size: 11px; color: var(--muted); display: block; font-weight: 700;">EMI AMOUNT</span>
+                <strong id="emiConfirmAmount" style="font-size: 14px; color: var(--ink);">₹0</strong>
+              </div>
+            </div>
+            <form id="emiConfirmForm" class="balance-form">
+              <div class="form-grid-2">
+                <label>
+                  Payment Date *
+                  <input type="date" id="emiConfirmDateInput" required>
+                </label>
+                <label>
+                  Payment Mode
+                  <select id="emiConfirmModeSelect">
+                    <option value="Bank Transfer" selected>Bank Transfer</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Card">Card</option>
+                    <option value="Net Banking">Net Banking</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                Notes
+                <input type="text" id="emiConfirmNotesInput" placeholder="Paid from salary account">
+              </label>
+              <div class="form-actions">
+                <button type="submit" class="primary-button" style="background: var(--green);">Confirm Payment</button>
+                <button type="button" id="emiConfirmCancelBtn" class="ghost-button">Cancel</button>
+              </div>
+            </form>
+          </section>
+
+          <!-- 6. Auto Transaction Created -->
+          <section class="panel" id="emiAutoTransactionPanel" style="display: none;">
+            <div class="panel-header">
+              <h3>6. Auto Transaction Created</h3>
+            </div>
+            
+            <div class="alert-message alert-message--warning" style="background: #e6f4ea; border-color: #a3cfb6; color: #137333; margin-bottom: 16px; display: flex; gap: 12px; align-items: center;">
+              <span class="alert-icon" style="background: rgba(19, 115, 51, 0.1); color: #137333;">✓</span>
+              <div>
+                <strong style="font-size: 14px;">EMI marked as paid successfully!</strong>
+                <p style="margin: 2px 0 0 0; font-size: 12px; color: #137333; opacity: 0.85;">A transaction has been created.</p>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Category</th>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>Payment Mode</th>
+                  </tr>
+                </thead>
+                <tbody id="emiAutoTransactionTableBody">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- 7. EMI Progress -->
+          <section class="panel">
+            <div class="panel-header">
+              <h3>7. EMI Progress</h3>
+            </div>
+            <div id="emiProgressTitle" style="margin-bottom: 12px; font-weight: 700; color: var(--ink);">-</div>
+            <div class="emi-progress-details">
+              <div>
+                <span>Paid EMI</span>
+                <strong id="emiProgressPaidCount">0 / 0</strong>
+              </div>
+              <div>
+                <span>Remaining EMI</span>
+                <strong id="emiProgressRemainingCount" style="color: var(--red);">0</strong>
+              </div>
+              <div>
+                <span>Remaining Amount</span>
+                <strong id="emiProgressRemainingAmount" style="color: var(--ink);">₹0</strong>
+              </div>
+            </div>
+            <div class="progress-block" style="margin-top: 10px;">
+              <div class="progress-track" style="height: 16px;">
+                <div id="emiProgressBarFill" class="progress-fill" style="width: 0%; background: var(--green);"></div>
+              </div>
+              <div id="emiProgressPercentText" style="text-align: right; font-size: 12px; font-weight: bold; color: var(--green); margin-top: 4px;">0%</div>
+            </div>
+          </section>
+
+          <!-- 8. EMI Impact on Budget -->
+          <section class="panel">
+            <div class="panel-header">
+              <h3>8. EMI Impact on Budget</h3>
+            </div>
+            <div style="margin-bottom: 12px; font-weight: 700; color: var(--ink);">Monthly Impact</div>
+            <div class="emi-impact-list">
+              <div class="emi-impact-row">
+                <span>Monthly Income</span>
+                <strong id="emiImpactIncome" class="green">₹0</strong>
+              </div>
+              <div class="emi-impact-row">
+                <span>Expected Expenses (Category Budget)</span>
+                <strong id="emiImpactExpenses" class="red">₹0</strong>
+              </div>
+              <div class="emi-impact-row">
+                <span>Expected Current Month EMI</span>
+                <strong id="emiImpactTotal" class="red">₹0</strong>
+              </div>
+              <div class="emi-impact-row" style="background: #fafbfc; padding: 10px 8px; border-radius: 4px; border-top: 2px solid var(--green);">
+                <span>Final Available Expected Balance</span>
+                <strong id="emiImpactBalance" class="green" style="font-size: 16px;">₹0</strong>
+              </div>
+            </div>
+            <div class="emi-impact-footer">
+              <span>ℹ️</span>
+              <span>Final balance is calculated by subtracting Category Budget and Expected EMI from Income.</span>
+            </div>
+          </section>
+
+          <!-- 9. Closed EMI -->
+          <section class="panel" style="grid-column: span 2;">
+            <div class="panel-header">
+              <h3>9. Closed EMI</h3>
+            </div>
+            <div style="margin-bottom: 12px; font-weight: 700; color: var(--ink);">Closed EMI Plans</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>EMI Name</th>
+                    <th>Total Amount</th>
+                    <th>Total Months</th>
+                    <th>Paid Months</th>
+                    <th>Closed On</th>
+                  </tr>
+                </thead>
+                <tbody id="emiClosedListBody">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+        </div>
       </section>
     </section>
   </main>

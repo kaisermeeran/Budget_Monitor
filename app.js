@@ -88,7 +88,56 @@ const els = {
   goalTemplate: document.querySelector("#goalTemplate"),
   exportBtn: document.querySelector("#exportBtn"),
   importInput: document.querySelector("#importInput"),
-  resetSampleBtn: document.querySelector("#resetSampleBtn")
+  resetSampleBtn: document.querySelector("#resetSampleBtn"),
+  
+  emiPlannerForm: document.querySelector("#emiPlannerForm"),
+  emiNameInput: document.querySelector("#emiNameInput"),
+  emiLoanAmountInput: document.querySelector("#emiLoanAmountInput"),
+  emiAmountInput: document.querySelector("#emiAmountInput"),
+  emiStartDateInput: document.querySelector("#emiStartDateInput"),
+  emiDueDayInput: document.querySelector("#emiDueDayInput"),
+  emiTotalMonthsInput: document.querySelector("#emiTotalMonthsInput"),
+  emiNotesInput: document.querySelector("#emiNotesInput"),
+  emiEditingId: document.querySelector("#emiEditingId"),
+  emiSaveBtn: document.querySelector("#emiSaveBtn"),
+  emiCancelBtn: document.querySelector("#emiCancelBtn"),
+  emiResetBtn: document.querySelector("#emiResetBtn"),
+  addEmiScrollBtn: document.querySelector("#addEmiScrollBtn"),
+  emiPlannerListBody: document.querySelector("#emiPlannerListBody"),
+  emiScheduleTitle: document.querySelector("#emiScheduleTitle"),
+  emiScheduleTableBody: document.querySelector("#emiScheduleTableBody"),
+  emiConfirmPaymentPanel: document.querySelector("#emiConfirmPaymentPanel"),
+  emiConfirmName: document.querySelector("#emiConfirmName"),
+  emiConfirmDate: document.querySelector("#emiConfirmDate"),
+  emiConfirmAmount: document.querySelector("#emiConfirmAmount"),
+  emiConfirmForm: document.querySelector("#emiConfirmForm"),
+  emiConfirmDateInput: document.querySelector("#emiConfirmDateInput"),
+  emiConfirmModeSelect: document.querySelector("#emiConfirmModeSelect"),
+  emiConfirmNotesInput: document.querySelector("#emiConfirmNotesInput"),
+  emiConfirmCancelBtn: document.querySelector("#emiConfirmCancelBtn"),
+  emiAutoTransactionPanel: document.querySelector("#emiAutoTransactionPanel"),
+  emiAutoTransactionTableBody: document.querySelector("#emiAutoTransactionTableBody"),
+  emiProgressTitle: document.querySelector("#emiProgressTitle"),
+  emiProgressPaidCount: document.querySelector("#emiProgressPaidCount"),
+  emiProgressRemainingCount: document.querySelector("#emiProgressRemainingCount"),
+  emiProgressRemainingAmount: document.querySelector("#emiProgressRemainingAmount"),
+  emiProgressBarFill: document.querySelector("#emiProgressBarFill"),
+  emiProgressPercentText: document.querySelector("#emiProgressPercentText"),
+  emiImpactIncome: document.querySelector("#emiImpactIncome"),
+  emiImpactExpenses: document.querySelector("#emiImpactExpenses"),
+  emiImpactTotal: document.querySelector("#emiImpactTotal"),
+  emiImpactBalance: document.querySelector("#emiImpactBalance"),
+  emiClosedListBody: document.querySelector("#emiClosedListBody"),
+  emiActiveCount: document.querySelector("#emiActiveCount"),
+  emiMonthlyCommitment: document.querySelector("#emiMonthlyCommitment"),
+  emiTotalRemaining: document.querySelector("#emiTotalRemaining"),
+  emiPaidTillNow: document.querySelector("#emiPaidTillNow"),
+  emiUpcomingBox: document.querySelector("#emiUpcomingBox"),
+  emiUpcomingName: document.querySelector("#emiUpcomingName"),
+  emiUpcomingAmount: document.querySelector("#emiUpcomingAmount"),
+  emiUpcomingDate: document.querySelector("#emiUpcomingDate"),
+  emiUpcomingMarkPaidBtn: document.querySelector("#emiUpcomingMarkPaidBtn"),
+  emiPlannerAlerts: document.querySelector("#emiPlannerAlerts")
 };
 
 async function fetchCategories() {
@@ -129,38 +178,7 @@ async function fetchCategories() {
 }
 
 function renderCategoryDropdown() {
-  const categorySelect = document.getElementById("transactionCategory");
-  const typeSelect = document.getElementById("transactionType");
-
-  if (!categorySelect || !typeSelect) return;
-
-  const selectedValue = categorySelect.value;
-  const plan = getPlan();
-  const values = typeSelect.value === "income"
-    ? uniqueSorted(plan.incomes.map((item) => item.description))
-    : uniqueSorted(plan.budgets.map((item) => item.name));
-
-  categorySelect.innerHTML = "";
-
-  if (!values.length) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = typeSelect.value === "income"
-      ? "Add income first"
-      : "Add expected budget first";
-    option.disabled = true;
-    option.selected = true;
-    categorySelect.appendChild(option);
-    return;
-  }
-
-  for (const value of values) {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = value;
-    option.selected = value === selectedValue;
-    categorySelect.appendChild(option);
-  }
+  // Category is now a text input, dropdown rendering is no longer needed.
 }
 
 function currentMonth() {
@@ -326,6 +344,7 @@ async function loadAppState() {
   els.dateInput.value = defaultDateForSelectedMonth();
   render();
   renderCategoryDropdown();
+  initPushNotifications();
 }
 
 function updateUserDisplay() {
@@ -466,7 +485,8 @@ function getInitialState() {
     compareBaseMonth: month,
     compareTargetMonth: month,
     transactions: [],
-    goals: []
+    goals: [],
+    emis: []
   };
 }
 
@@ -499,6 +519,36 @@ function getSampleState() {
     goals: [
       { id: crypto.randomUUID(), name: "Emergency fund", target: 8000, saved: 2700 },
       { id: crypto.randomUUID(), name: "Travel", target: 2500, saved: 840 }
+    ],
+    emis: [
+      {
+        id: "bike-loan-id",
+        name: "Bike Loan",
+        loanAmount: 120000,
+        emiAmount: 4000,
+        startDate: "2026-07-01",
+        dueDay: 5,
+        totalMonths: 36,
+        notes: "Personal Bike Loan",
+        status: "active",
+        paidMonths: {}
+      },
+      {
+        id: "personal-loan-id",
+        name: "Personal Loan",
+        loanAmount: 576000,
+        emiAmount: 12000,
+        startDate: "2025-09-01",
+        dueDay: 5,
+        totalMonths: 48,
+        notes: "Personal Loan",
+        status: "active",
+        paidMonths: {
+          "2025-09": "2025-09-05", "2025-10": "2025-10-05", "2025-11": "2025-11-05", "2025-12": "2025-12-05",
+          "2026-01": "2026-01-05", "2026-02": "2026-02-05", "2026-03": "2026-03-05", "2026-04": "2026-04-05",
+          "2026-05": "2026-05-05", "2026-06": "2026-06-05"
+        }
+      }
     ]
   };
 }
@@ -627,8 +677,14 @@ function normalizeState() {
   state.plans ||= {};
   state.transactions ||= [];
   state.goals ||= [];
+  state.emis ||= [];
   state.compareBaseMonth ||= "";
   state.compareTargetMonth ||= "";
+  
+  if (!state.selectedEmiId && state.emis.length > 0) {
+    state.selectedEmiId = state.emis[0].id;
+  }
+  
   state.transactions = state.transactions.map((item) => ({
     id: item.id || crypto.randomUUID(),
     type: item.type === "income" ? "income" : "expense",
@@ -690,8 +746,7 @@ function uniqueSorted(values) {
     .sort((a, b) => a.localeCompare(b));
 }
 
-function getPlan() {
-
+function getPlanForMonth(monthStr) {
   if (!state) {
     state = getInitialState();
   }
@@ -700,17 +755,13 @@ function getPlan() {
     state.plans = {};
   }
 
-  if (!state.selectedMonth) {
-    state.selectedMonth = currentMonth();
-  }
-
-  if (!state.plans[state.selectedMonth]) {
-    state.plans[state.selectedMonth] = {
+  if (!state.plans[monthStr]) {
+    state.plans[monthStr] = {
       income: 0,
       incomes: [],
       budgets: []
     };
-    const plan = state.plans[state.selectedMonth];
+    const plan = state.plans[monthStr];
     if (Array.isArray(state.categories) && state.categories.length > 0) {
       plan.budgets = state.categories
         .filter(c => c.type === "expense")
@@ -729,15 +780,27 @@ function getPlan() {
     }
   }
 
-  if (!Array.isArray(state.plans[state.selectedMonth].incomes)) {
-    state.plans[state.selectedMonth].incomes = [];
+  if (!Array.isArray(state.plans[monthStr].incomes)) {
+    state.plans[monthStr].incomes = [];
   }
 
-  if (!Array.isArray(state.plans[state.selectedMonth].budgets)) {
-    state.plans[state.selectedMonth].budgets = [];
+  if (!Array.isArray(state.plans[monthStr].budgets)) {
+    state.plans[monthStr].budgets = [];
   }
 
-  return state.plans[state.selectedMonth];
+  return state.plans[monthStr];
+}
+
+function getPlan() {
+  if (!state) {
+    state = getInitialState();
+  }
+
+  if (!state.selectedMonth) {
+    state.selectedMonth = currentMonth();
+  }
+
+  return getPlanForMonth(state.selectedMonth);
 }
 
 function monthlyTransactions() {
@@ -763,21 +826,47 @@ function totals() {
   const income = plan.incomes.reduce((sum, item) => sum + item.amount, 0);
   plan.income = income;
   const available = income;
-  const expenses = rows.filter((row) => row.type === "expense").reduce((sum, row) => sum + row.amount, 0);
-  const expectedRemaining = income - budgetTotal;
-  const actualRemaining = income - expenses;
-  const remainingBudget = budgetTotal - expenses;
+
+  // Calculate EMI expectations and payments for current month
+  const emis = state.emis || [];
+  const currentMonthEmiAmount = emis
+    .filter(e => isEmiScheduledForMonth(e, state.selectedMonth))
+    .reduce((sum, e) => sum + e.emiAmount, 0);
+
+  const currentMonthPaidEmiAmount = emis
+    .filter(e => e.paidMonths && e.paidMonths[state.selectedMonth])
+    .reduce((sum, e) => sum + e.emiAmount, 0);
+
+  // Non-EMI expenses (transactions where category does not start with "EMI - ")
+  const nonEmiExpenses = rows
+    .filter((row) => row.type === "expense" && (!row.category || !row.category.startsWith("EMI - ")))
+    .reduce((sum, row) => sum + row.amount, 0);
+
+  // Expected Monthly Budget includes category budgets + expected EMIs
+  const expenseLimit = budgetTotal + currentMonthEmiAmount;
+
+  // Actual Expenses includes non-EMI expenses + paid EMIs
+  const expenses = nonEmiExpenses + currentMonthPaidEmiAmount;
+
+  // Expected Remaining Amount = Income - Expected Budget - Current Month EMI Amount
+  const expectedRemaining = income - budgetTotal - currentMonthEmiAmount;
+
+  // Actual Remaining = Income - Actual Expenses - Current Month Paid EMI Amount
+  const actualRemaining = income - nonEmiExpenses - currentMonthPaidEmiAmount;
+
+  const remainingBudget = expenseLimit - expenses;
+
   return {
     income,
     available,
     expenses,
-    expenseLimit: budgetTotal,
+    expenseLimit,
     saved: actualRemaining,
     leftToSave: actualRemaining,
     expectedRemaining,
     actualRemaining,
     remainingBudget,
-    overspent: Math.max(expenses - budgetTotal, 0),
+    overspent: Math.max(expenses - expenseLimit, 0),
     plan
   };
 }
@@ -872,6 +961,7 @@ function render() {
   renderGoals();
   drawChart(categories);
   renderComparisonReport();
+  renderEmiPlanner();
 }
 
 function renderSuggestionLists() {
@@ -896,6 +986,28 @@ function renderOverviewAlerts(total) {
       message: "Actual Expenses exceed the Expected Monthly Budget. Track overspending, but you may continue."
     });
   }
+  
+  const upcoming = getUpcomingInstallments();
+  if (upcoming.length > 0) {
+    const nextEmi = upcoming[0];
+    const targetDate = new Date(nextEmi.dueDate);
+    targetDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const diffTime = targetDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays >= 0 && diffDays <= 1) {
+      const label = diffDays === 0 ? "Due Today" : "Due Tomorrow";
+      alerts.push({
+        icon: "⏰",
+        type: "warning",
+        message: `EMI ${label}: ${nextEmi.emi.name} of ${currency.format(nextEmi.amount)} is due on ${formatDateWithSpace(nextEmi.dueDate)}.`
+      });
+    }
+  }
+  
   if (!els.overviewAlerts) return;
   if (alerts.length) {
     els.overviewAlerts.hidden = false;
@@ -1030,7 +1142,9 @@ function renderCategorySuggestions() {
     return;
   }
   const query = els.categoryInput.value.trim().toLowerCase();
-  const values = (state.savedBudgetNames || []).filter((name) => {
+  const isIncome = els.typeInput.value === "income";
+  const suggestionsSource = isIncome ? state.savedIncomeDescriptions : state.savedBudgetNames;
+  const values = (suggestionsSource || []).filter((name) => {
     return !query || name.toLowerCase().includes(query);
   });
 
@@ -1585,13 +1699,427 @@ function reportError(error) {
   alert(`Database action failed. Please make sure the backend server is running${message}`);
 }
 
+function getDueDateForMonthIndex(startDateStr, dueDay, index) {
+  const parts = startDateStr.split('-');
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1; // 0-indexed
+  
+  const d = new Date(year, month + index, 1);
+  const maxDay = new Date(year, month + index + 1, 0).getDate();
+  const targetDay = Math.min(parseInt(dueDay, 10) || 5, maxDay);
+  
+  const targetYear = d.getFullYear();
+  const targetMonth = String(d.getMonth() + 1).padStart(2, '0');
+  const targetDayStr = String(targetDay).padStart(2, '0');
+  return `${targetYear}-${targetMonth}-${targetDayStr}`;
+}
+
+function getUpcomingInstallments() {
+  const upcoming = [];
+  const activeEmis = (state.emis || []).filter(e => e.status === "active");
+  
+  for (const emi of activeEmis) {
+    const paidMonthsKeys = Object.keys(emi.paidMonths || {});
+    for (let i = 0; i < emi.totalMonths; i++) {
+      const dueDate = getDueDateForMonthIndex(emi.startDate, emi.dueDay, i);
+      const monthStr = dueDate.slice(0, 7); // YYYY-MM
+      if (!paidMonthsKeys.includes(monthStr)) {
+        upcoming.push({
+          emi,
+          dueDate,
+          monthStr,
+          amount: emi.emiAmount
+        });
+        break;
+      }
+    }
+  }
+  
+  upcoming.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  return upcoming;
+}
+
+function isEmiScheduledForMonth(emi, monthStr) {
+  for (let i = 0; i < emi.totalMonths; i++) {
+    const dueDate = getDueDateForMonthIndex(emi.startDate, emi.dueDay, i);
+    if (dueDate.slice(0, 7) === monthStr) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function formatDateWithSpace(dateStr) {
+  if (!dateStr) return "-";
+  const parts = dateStr.split("-");
+  if (parts.length !== 3) return dateStr;
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const day = String(parseInt(parts[2], 10)).padStart(2, '0');
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const month = months[monthIdx] || parts[1];
+  const year = parts[0];
+  return `${day} ${month} ${year}`;
+}
+
+function formatDateWithDash(dateStr) {
+  if (!dateStr) return "-";
+  const parts = dateStr.split("-");
+  if (parts.length !== 3) return dateStr;
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const day = String(parseInt(parts[2], 10)).padStart(2, '0');
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const month = months[monthIdx] || parts[1];
+  const year = parts[0];
+  return `${day}-${month}-${year}`;
+}
+
+function checkEmiDueReminders() {
+  const upcoming = getUpcomingInstallments();
+  
+  if (els.emiPlannerAlerts) {
+    els.emiPlannerAlerts.hidden = true;
+    els.emiPlannerAlerts.innerHTML = "";
+  }
+  
+  if (upcoming.length > 0) {
+    const nextEmi = upcoming[0];
+    const targetDate = new Date(nextEmi.dueDate);
+    targetDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const diffTime = targetDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays >= 0 && diffDays <= 1) {
+      const label = diffDays === 0 ? "Due Today" : "Due Tomorrow";
+      if (els.emiPlannerAlerts) {
+        els.emiPlannerAlerts.hidden = false;
+        els.emiPlannerAlerts.innerHTML = `
+          <div class="alert-message alert-message--warning">
+            <span class="alert-icon" aria-hidden="true">⚠️</span>
+            <div>
+              <strong>EMI ${label}</strong>
+              <p style="margin: 2px 0 0 0; font-size: 13px;">${escapeHtml(nextEmi.emi.name)} | Amount: ${currency.format(nextEmi.amount)} | Due Date: ${formatDateWithSpace(nextEmi.dueDate)}</p>
+            </div>
+          </div>
+        `;
+      }
+      
+      if (Notification.permission === "granted") {
+        const sentKey = `emi-notif-${nextEmi.emi.id}-${nextEmi.dueDate}`;
+        if (!localStorage.getItem(sentKey)) {
+          new Notification(`EMI ${label}`, {
+            body: `${nextEmi.emi.name} of ${currency.format(nextEmi.amount)} is due on ${formatDateWithSpace(nextEmi.dueDate)}`
+          });
+          localStorage.setItem(sentKey, "true");
+        }
+      }
+    }
+  }
+}
+
+function initPushNotifications() {
+  if ("Notification" in window) {
+    if (Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }
+}
+
+function renderEmiPlanner() {
+  if (!state || !state.emis) return;
+  
+  const activeEmis = state.emis.filter(e => e.status === "active");
+  const monthlyCommitment = activeEmis.reduce((sum, e) => sum + e.emiAmount, 0);
+  
+  let totalRemaining = 0;
+  let paidTillNow = 0;
+  
+  for (const emi of state.emis) {
+    const paidCount = Object.keys(emi.paidMonths || {}).length;
+    const paidAmt = paidCount * emi.emiAmount;
+    paidTillNow += paidAmt;
+    
+    if (emi.status === "active") {
+      const remainingCount = emi.totalMonths - paidCount;
+      const remainingAmt = remainingCount * emi.emiAmount;
+      totalRemaining += remainingAmt;
+    }
+  }
+  
+  if (els.emiActiveCount) els.emiActiveCount.textContent = activeEmis.length;
+  if (els.emiMonthlyCommitment) els.emiMonthlyCommitment.textContent = currency.format(monthlyCommitment);
+  if (els.emiTotalRemaining) els.emiTotalRemaining.textContent = currency.format(totalRemaining);
+  if (els.emiPaidTillNow) els.emiPaidTillNow.textContent = currency.format(paidTillNow);
+  
+  const upcoming = getUpcomingInstallments();
+  if (els.emiUpcomingBox) {
+    if (upcoming.length > 0) {
+      const nextEmi = upcoming[0];
+      if (els.emiUpcomingName) els.emiUpcomingName.textContent = nextEmi.emi.name;
+      if (els.emiUpcomingAmount) els.emiUpcomingAmount.textContent = currency.format(nextEmi.amount);
+      if (els.emiUpcomingDate) els.emiUpcomingDate.textContent = formatDateWithSpace(nextEmi.dueDate);
+      
+      els.emiUpcomingMarkPaidBtn.style.display = "inline-block";
+      els.emiUpcomingMarkPaidBtn.onclick = () => {
+        if (els.emiConfirmPaymentPanel) {
+          els.emiConfirmName.textContent = nextEmi.emi.name;
+          els.emiConfirmDate.textContent = formatDateWithSpace(nextEmi.dueDate);
+          els.emiConfirmAmount.textContent = currency.format(nextEmi.amount);
+          
+          els.emiConfirmDateInput.value = nextEmi.dueDate;
+          els.emiConfirmNotesInput.value = `Paid installment for ${formatDateWithDash(nextEmi.dueDate).slice(3)}`;
+          
+          els.emiConfirmForm.dataset.emiId = nextEmi.emi.id;
+          els.emiConfirmForm.dataset.monthStr = nextEmi.monthStr;
+          els.emiConfirmForm.dataset.dueDate = nextEmi.dueDate;
+          els.emiConfirmForm.dataset.amount = nextEmi.amount;
+          
+          els.emiConfirmPaymentPanel.style.display = "block";
+          els.emiConfirmPaymentPanel.scrollIntoView({ behavior: 'smooth' });
+        }
+      };
+    } else {
+      if (els.emiUpcomingName) els.emiUpcomingName.textContent = "No Upcoming EMI";
+      if (els.emiUpcomingAmount) els.emiUpcomingAmount.textContent = "";
+      if (els.emiUpcomingDate) els.emiUpcomingDate.textContent = "-";
+      els.emiUpcomingMarkPaidBtn.style.display = "none";
+    }
+  }
+  
+  if (els.emiPlannerListBody) {
+    els.emiPlannerListBody.innerHTML = "";
+    if (activeEmis.length === 0) {
+      els.emiPlannerListBody.innerHTML = `<tr><td colspan="7" style="text-align: center;">No active EMI plans.</td></tr>`;
+    } else {
+      activeEmis.forEach(emi => {
+        const paidCount = Object.keys(emi.paidMonths || {}).length;
+        const remainingCount = emi.totalMonths - paidCount;
+        const isSelected = emi.id === state.selectedEmiId;
+        
+        const tr = document.createElement("tr");
+        if (isSelected) {
+          tr.style.backgroundColor = "rgba(26, 115, 232, 0.08)";
+        }
+        tr.innerHTML = `
+          <td><strong>${escapeHtml(emi.name)}</strong></td>
+          <td>${currency.format(emi.emiAmount)}</td>
+          <td>${emi.totalMonths}</td>
+          <td>${paidCount}</td>
+          <td>${remainingCount}</td>
+          <td><span class="emi-badge active" style="background-color: #e8f0fe; color: #1a73e8;">Active</span></td>
+          <td>
+            <button class="edit-row view-details-btn" type="button" title="View details" style="background: #e8f0fe; color: #1a73e8; border-color: #d2e3fc; min-width: 34px; height: 34px; padding: 0;">👁️</button>
+            <button class="edit-row edit-plan-btn" type="button" title="Edit plan" style="min-width: 50px; height: 34px;">Edit</button>
+            <button class="delete-row delete-plan-btn" type="button" title="Delete plan" style="width: 34px; height: 34px;">x</button>
+          </td>
+        `;
+        
+        tr.querySelector(".view-details-btn").addEventListener("click", () => {
+          state.selectedEmiId = emi.id;
+          renderEmiPlanner();
+        });
+        
+        tr.querySelector(".edit-plan-btn").addEventListener("click", () => {
+          els.emiEditingId.value = emi.id;
+          els.emiNameInput.value = emi.name;
+          els.emiLoanAmountInput.value = emi.loanAmount;
+          els.emiAmountInput.value = emi.emiAmount;
+          els.emiStartDateInput.value = emi.startDate;
+          els.emiDueDayInput.value = emi.dueDay;
+          els.emiTotalMonthsInput.value = emi.totalMonths;
+          els.emiNotesInput.value = emi.notes || "";
+          
+          els.emiSaveBtn.textContent = "Update EMI Plan";
+          els.emiCancelBtn.style.display = "inline-block";
+          els.emiPlannerForm.scrollIntoView({ behavior: 'smooth' });
+        });
+        
+        tr.querySelector(".delete-plan-btn").addEventListener("click", async () => {
+          if (confirm(`Are you sure you want to delete ${emi.name}?`)) {
+            state.emis = state.emis.filter(e => e.id !== emi.id);
+            if (state.selectedEmiId === emi.id) {
+              state.selectedEmiId = state.emis.length > 0 ? state.emis[0].id : null;
+            }
+            try {
+              await saveState();
+              render();
+            } catch (error) {
+              reportError(error);
+            }
+          }
+        });
+        
+        els.emiPlannerListBody.appendChild(tr);
+      });
+    }
+  }
+  
+  const selectedEmi = state.emis.find(e => e.id === state.selectedEmiId);
+  if (selectedEmi) {
+    if (els.emiScheduleTitle) {
+      els.emiScheduleTitle.textContent = `${selectedEmi.name} - Payment Schedule`;
+    }
+    if (els.emiProgressTitle) {
+      els.emiProgressTitle.textContent = selectedEmi.name;
+    }
+    
+    const paidCount = Object.keys(selectedEmi.paidMonths || {}).length;
+    const remainingCount = selectedEmi.totalMonths - paidCount;
+    const remainingAmt = remainingCount * selectedEmi.emiAmount;
+    const percent = selectedEmi.totalMonths > 0 ? (paidCount / selectedEmi.totalMonths) * 100 : 0;
+    
+    if (els.emiProgressPaidCount) els.emiProgressPaidCount.textContent = `${paidCount} / ${selectedEmi.totalMonths}`;
+    if (els.emiProgressRemainingCount) els.emiProgressRemainingCount.textContent = remainingCount;
+    if (els.emiProgressRemainingAmount) els.emiProgressRemainingAmount.textContent = currency.format(remainingAmt);
+    if (els.emiProgressBarFill) els.emiProgressBarFill.style.width = `${percent}%`;
+    if (els.emiProgressPercentText) els.emiProgressPercentText.textContent = `${percent.toFixed(2)}%`;
+    
+    if (els.emiScheduleTableBody) {
+      els.emiScheduleTableBody.innerHTML = "";
+      for (let i = 0; i < selectedEmi.totalMonths; i++) {
+        const dueDate = getDueDateForMonthIndex(selectedEmi.startDate, selectedEmi.dueDay, i);
+        const monthStr = dueDate.slice(0, 7);
+        const displayMonth = formatDateWithDash(dueDate).slice(3);
+        const paymentDate = selectedEmi.paidMonths[monthStr];
+        const isPaid = !!paymentDate;
+        
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${formatDateWithSpace(dueDate)}</td>
+          <td>${currency.format(selectedEmi.emiAmount)}</td>
+          <td>
+            <span class="emi-badge ${isPaid ? 'paid' : 'pending'}">${isPaid ? 'Paid' : 'Pending'}</span>
+          </td>
+          <td>${isPaid ? formatDateWithSpace(paymentDate) : '-'}</td>
+          <td>
+            ${isPaid 
+              ? `<button class="edit-row view-payment-details" type="button" style="min-height: 30px; min-width: 60px;">View</button>`
+              : `<button class="primary-button schedule-pay-btn" type="button" style="min-height: 30px; background: var(--green); padding: 0 10px;">Mark as Paid</button>`
+            }
+          </td>
+        `;
+        
+        if (isPaid) {
+          tr.querySelector(".view-payment-details").addEventListener("click", () => {
+            const tx = state.transactions.find(t => 
+              t.category === `EMI - ${selectedEmi.name}` && 
+              t.date === paymentDate && 
+              t.amount === selectedEmi.emiAmount
+            );
+            if (tx) {
+              if (els.emiAutoTransactionPanel && els.emiAutoTransactionTableBody) {
+                els.emiAutoTransactionTableBody.innerHTML = `
+                  <tr>
+                    <td>${formatDateWithSpace(tx.date)}</td>
+                    <td><span class="emi-badge pending" style="background-color: #fce8e6; color: #c5221f;">Expense</span></td>
+                    <td><strong>${escapeHtml(tx.category)}</strong></td>
+                    <td>${escapeHtml(tx.note)}</td>
+                    <td>${currency.format(tx.amount)}</td>
+                    <td>Bank Transfer</td>
+                  </tr>
+                `;
+                els.emiAutoTransactionPanel.style.display = "block";
+                els.emiAutoTransactionPanel.scrollIntoView({ behavior: 'smooth' });
+              }
+            } else {
+              alert(`Payment confirmed on ${formatDateWithSpace(paymentDate)}.`);
+            }
+          });
+        } else {
+          tr.querySelector(".schedule-pay-btn").addEventListener("click", () => {
+            if (els.emiConfirmPaymentPanel) {
+              els.emiConfirmName.textContent = selectedEmi.name;
+              els.emiConfirmDate.textContent = formatDateWithSpace(dueDate);
+              els.emiConfirmAmount.textContent = currency.format(selectedEmi.emiAmount);
+              
+              els.emiConfirmDateInput.value = dueDate;
+              els.emiConfirmNotesInput.value = `Paid installment for ${displayMonth}`;
+              
+              els.emiConfirmForm.dataset.emiId = selectedEmi.id;
+              els.emiConfirmForm.dataset.monthStr = monthStr;
+              els.emiConfirmForm.dataset.dueDate = dueDate;
+              els.emiConfirmForm.dataset.amount = selectedEmi.emiAmount;
+              
+              els.emiConfirmPaymentPanel.style.display = "block";
+              els.emiConfirmPaymentPanel.scrollIntoView({ behavior: 'smooth' });
+            }
+          });
+        }
+        els.emiScheduleTableBody.appendChild(tr);
+      }
+    }
+  } else {
+    if (els.emiScheduleTitle) els.emiScheduleTitle.textContent = "-";
+    if (els.emiScheduleTableBody) els.emiScheduleTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">Select an EMI plan to view details.</td></tr>`;
+    if (els.emiProgressTitle) els.emiProgressTitle.textContent = "-";
+    if (els.emiProgressPaidCount) els.emiProgressPaidCount.textContent = "0 / 0";
+    if (els.emiProgressRemainingCount) els.emiProgressRemainingCount.textContent = "0";
+    if (els.emiProgressRemainingAmount) els.emiProgressRemainingAmount.textContent = "₹0";
+    if (els.emiProgressBarFill) els.emiProgressBarFill.style.width = "0%";
+    if (els.emiProgressPercentText) els.emiProgressPercentText.textContent = "0%";
+  }
+  
+  const total = totals();
+  const plan = getPlan();
+  const activeEmiNames = (state.emis || []).map(e => e.name.toLowerCase());
+  const categoryBudgetTotal = plan.budgets
+    .filter(b => {
+      const name = b.name.toLowerCase();
+      return !name.startsWith("emi") && !activeEmiNames.includes(name);
+    })
+    .reduce((sum, item) => sum + item.amount, 0);
+  const scheduledEmis = state.emis.filter(e => e.status === "active" && isEmiScheduledForMonth(e, state.selectedMonth));
+  const scheduledEmiTotal = scheduledEmis.reduce((sum, e) => sum + e.emiAmount, 0);
+  const budgetImpactBalance = total.income - categoryBudgetTotal - scheduledEmiTotal;
+  
+  if (els.emiImpactIncome) els.emiImpactIncome.textContent = currency.format(total.income);
+  if (els.emiImpactExpenses) els.emiImpactExpenses.textContent = currency.format(categoryBudgetTotal);
+  if (els.emiImpactTotal) els.emiImpactTotal.textContent = currency.format(scheduledEmiTotal);
+  if (els.emiImpactBalance) {
+    els.emiImpactBalance.textContent = currency.format(budgetImpactBalance);
+    els.emiImpactBalance.className = budgetImpactBalance >= 0 ? "green" : "red";
+  }
+  
+  if (els.emiClosedListBody) {
+    els.emiClosedListBody.innerHTML = "";
+    const closedEmis = state.emis.filter(e => e.status === "closed");
+    if (closedEmis.length === 0) {
+      els.emiClosedListBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">No closed EMI plans.</td></tr>`;
+    } else {
+      closedEmis.forEach(emi => {
+        const paymentDates = Object.values(emi.paidMonths || {});
+        paymentDates.sort();
+        const lastPaymentDate = paymentDates[paymentDates.length - 1] || "-";
+        
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><strong>${escapeHtml(emi.name)}</strong></td>
+          <td>${currency.format(emi.loanAmount)}</td>
+          <td>${emi.totalMonths}</td>
+          <td>${emi.totalMonths}</td>
+          <td>${formatDateWithSpace(lastPaymentDate)}</td>
+        `;
+        els.emiClosedListBody.appendChild(tr);
+      });
+    }
+  }
+  
+  checkEmiDueReminders();
+}
+
 els.tabs.forEach((button) => {
   button.addEventListener("click", () => {
     els.tabs.forEach((tab) => tab.classList.toggle("active", tab === button));
     document.querySelectorAll(".view").forEach((view) => {
       view.classList.toggle("active", view.id === `${button.dataset.view}View`);
     });
-    els.pageTitle.textContent = titleCase(button.dataset.view);
+    if (button.dataset.view === "emiPlanner") {
+      els.pageTitle.textContent = "EMI Planner";
+    } else {
+      els.pageTitle.textContent = titleCase(button.dataset.view);
+    }
     requestAnimationFrame(render);
   });
 });
@@ -1788,7 +2316,11 @@ els.categorySuggestionList?.addEventListener("click", async (event) => {
   const removeButton = event.target.closest("button.budget-suggestion-remove");
   if (!removeButton) return;
   const name = removeButton.dataset.name;
-  state.savedBudgetNames = (state.savedBudgetNames || []).filter((value) => value !== name);
+  if (els.typeInput.value === "income") {
+    state.savedIncomeDescriptions = (state.savedIncomeDescriptions || []).filter((value) => value !== name);
+  } else {
+    state.savedBudgetNames = (state.savedBudgetNames || []).filter((value) => value !== name);
+  }
   try {
     await saveState();
     render();
@@ -1882,21 +2414,45 @@ els.transactionForm.addEventListener("submit", async (event) => {
   const category = els.categoryInput.value.trim();
 
   if (!category) {
-    alert(els.typeInput.value === "income"
-      ? "Add income first, then select it for the transaction."
-      : "Add expected budget first, then select it for the transaction.");
+    alert("Category is required.");
     els.categoryInput.focus();
     return;
   }
 
+  const date = els.dateInput.value || defaultDateForSelectedMonth();
+  const txMonth = monthFromDate(date);
+  const txType = els.typeInput.value;
+
   const transaction = {
     id: editingTransactionId || crypto.randomUUID(),
-    type: els.typeInput.value,
+    type: txType,
     category,
     amount: Number(els.amountInput.value),
-    date: els.dateInput.value || defaultDateForSelectedMonth(),
+    date: date,
     note: els.noteInput.value.trim()
   };
+
+  // Automatically add custom category to expected budget if not present
+  const plan = getPlanForMonth(txMonth);
+  if (txType === "expense") {
+    const existing = plan.budgets.find(b => b.name.toLowerCase() === category.toLowerCase());
+    if (!existing) {
+      plan.budgets.push({
+        id: crypto.randomUUID(),
+        name: category,
+        amount: transaction.amount
+      });
+    }
+  } else if (txType === "income") {
+    const existing = plan.incomes.find(i => i.description.toLowerCase() === category.toLowerCase());
+    if (!existing) {
+      plan.incomes.push({
+        id: crypto.randomUUID(),
+        description: category,
+        amount: transaction.amount
+      });
+    }
+  }
 
   if (editingTransactionId) {
     const existingIndex = state.transactions.findIndex((item) => item.id == editingTransactionId);
@@ -2062,6 +2618,157 @@ els.resetSampleBtn.addEventListener("click", async () => {
     reportError(error);
   }
 });
+// === EMI PLANNER EVENT LISTENERS ===
+if (els.addEmiScrollBtn) {
+  els.addEmiScrollBtn.addEventListener("click", () => {
+    if (els.emiPlannerForm) {
+      els.emiPlannerForm.reset();
+      els.emiEditingId.value = "";
+      els.emiSaveBtn.textContent = "Save EMI Plan";
+      els.emiCancelBtn.style.display = "none";
+      els.emiNameInput.focus();
+      els.emiPlannerForm.scrollIntoView({ behavior: 'smooth' });
+    }
+  });
+}
+
+if (els.emiPlannerForm) {
+  els.emiPlannerForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    
+    const id = els.emiEditingId.value;
+    const name = els.emiNameInput.value.trim();
+    const loanAmount = Number(els.emiLoanAmountInput.value) || 0;
+    const emiAmount = Number(els.emiAmountInput.value) || 0;
+    const startDate = els.emiStartDateInput.value;
+    const dueDayVal = els.emiDueDayInput.value.trim();
+    const dueDay = Number(dueDayVal);
+    if (!dueDayVal || isNaN(dueDay) || dueDay < 1 || dueDay > 31 || !Number.isInteger(dueDay)) {
+      alert("Due day must be an integer between 1 and 31.");
+      els.emiDueDayInput.focus();
+      return;
+    }
+    const totalMonths = Number(els.emiTotalMonthsInput.value) || 0;
+    const notes = els.emiNotesInput.value.trim();
+    
+    if (id) {
+      const emi = state.emis.find(e => e.id === id);
+      if (emi) {
+        emi.name = name;
+        emi.loanAmount = loanAmount;
+        emi.emiAmount = emiAmount;
+        emi.startDate = startDate;
+        emi.dueDay = dueDay;
+        emi.totalMonths = totalMonths;
+        emi.notes = notes;
+      }
+    } else {
+      const newId = crypto.randomUUID();
+      state.emis.push({
+        id: newId,
+        name,
+        loanAmount,
+        emiAmount,
+        startDate,
+        dueDay,
+        totalMonths,
+        notes,
+        status: "active",
+        paidMonths: {}
+      });
+      state.selectedEmiId = newId;
+    }
+    
+    els.emiPlannerForm.reset();
+    els.emiEditingId.value = "";
+    els.emiSaveBtn.textContent = "Save EMI Plan";
+    els.emiCancelBtn.style.display = "none";
+    
+    try {
+      await saveState();
+      render();
+    } catch (error) {
+      reportError(error);
+    }
+  });
+}
+
+if (els.emiCancelBtn) {
+  els.emiCancelBtn.addEventListener("click", () => {
+    els.emiPlannerForm.reset();
+    els.emiEditingId.value = "";
+    els.emiSaveBtn.textContent = "Save EMI Plan";
+    els.emiCancelBtn.style.display = "none";
+  });
+}
+
+if (els.emiConfirmForm) {
+  els.emiConfirmForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    
+    const emiId = els.emiConfirmForm.dataset.emiId;
+    const monthStr = els.emiConfirmForm.dataset.monthStr;
+    const dueDate = els.emiConfirmForm.dataset.dueDate;
+    const amount = Number(els.emiConfirmForm.dataset.amount) || 0;
+    
+    const paymentDate = els.emiConfirmDateInput.value;
+    const paymentMode = els.emiConfirmModeSelect.value;
+    const notes = els.emiConfirmNotesInput.value.trim();
+    
+    const emi = state.emis.find(e => e.id === emiId);
+    if (!emi) return;
+    
+    emi.paidMonths[monthStr] = paymentDate;
+    
+    if (Object.keys(emi.paidMonths).length === emi.totalMonths) {
+      emi.status = "closed";
+    }
+    
+    const txId = crypto.randomUUID();
+    state.transactions.push({
+      id: txId,
+      type: "expense",
+      category: `EMI - ${emi.name}`,
+      amount: amount,
+      date: paymentDate,
+      note: notes || `${emi.name} EMI Paid`
+    });
+    
+    if (els.emiConfirmPaymentPanel) {
+      els.emiConfirmPaymentPanel.style.display = "none";
+    }
+    
+    if (els.emiAutoTransactionPanel && els.emiAutoTransactionTableBody) {
+      els.emiAutoTransactionTableBody.innerHTML = `
+        <tr>
+          <td>${formatDateWithSpace(paymentDate)}</td>
+          <td><span class="emi-badge pending" style="background-color: #fce8e6; color: #c5221f;">Expense</span></td>
+          <td><strong>EMI - ${escapeHtml(emi.name)}</strong></td>
+          <td>${escapeHtml(notes || `${emi.name} EMI Paid`)}</td>
+          <td>${currency.format(amount)}</td>
+          <td>${escapeHtml(paymentMode)}</td>
+        </tr>
+      `;
+      els.emiAutoTransactionPanel.style.display = "block";
+      els.emiAutoTransactionPanel.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    try {
+      await saveState();
+      render();
+    } catch (error) {
+      reportError(error);
+    }
+  });
+}
+
+if (els.emiConfirmCancelBtn) {
+  els.emiConfirmCancelBtn.addEventListener("click", () => {
+    if (els.emiConfirmPaymentPanel) {
+      els.emiConfirmPaymentPanel.style.display = "none";
+    }
+  });
+}
 
 window.addEventListener("resize", () => requestAnimationFrame(render));
 

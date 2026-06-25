@@ -945,3 +945,231 @@ tr.budget-negative .remaining-cell {
     display: grid;
   }
 }
+
+/* ==========================================
+   EMI Planner Styling
+   ========================================== */
+.emi-planner-layout {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.emi-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.emi-overview-card {
+  padding: 16px;
+  background: #f8faf7;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.emi-overview-card span {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.emi-overview-card strong {
+  font-size: 20px;
+  color: var(--ink);
+}
+
+.emi-upcoming-box {
+  margin-top: 16px;
+  padding: 16px;
+  background: #fff8eb;
+  border: 1px solid #f5d4a0;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.emi-upcoming-info h4 {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.emi-upcoming-info p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.emi-summary-box {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.emi-summary-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.legend-color.paid {
+  background-color: var(--green);
+}
+
+.legend-color.remaining {
+  background-color: #cfd8d0;
+}
+
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* Badges */
+.emi-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.emi-badge.paid {
+  background-color: #e6f4ea;
+  color: #137333;
+}
+
+.emi-badge.pending {
+  background-color: #fef7e0;
+  color: #b06000;
+}
+
+.emi-badge.active {
+  background-color: #e8f0fe;
+  color: #1a73e8;
+}
+
+/* Progress Section */
+.emi-progress-details {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  background: #f8faf7;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+
+.emi-progress-details div {
+  text-align: center;
+}
+
+.emi-progress-details span {
+  font-size: 11px;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.emi-progress-details strong {
+  font-size: 16px;
+  color: var(--ink);
+}
+
+/* Impact on Budget Section */
+.emi-impact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.emi-impact-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.emi-impact-row:last-child {
+  border-bottom: none;
+}
+
+.emi-impact-row span {
+  font-weight: 700;
+  font-size: 13px;
+  color: #38453f;
+}
+
+.emi-impact-row strong.green {
+  color: var(--green);
+}
+
+.emi-impact-row strong.red {
+  color: var(--red);
+}
+
+.emi-impact-footer {
+  margin-top: 12px;
+  padding: 8px 10px;
+  background: #f8faf7;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 1000px) {
+  .emi-planner-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .emi-planner-layout .panel[style*="grid-column: span 2"] {
+    grid-column: auto !important;
+  }
+}
+
