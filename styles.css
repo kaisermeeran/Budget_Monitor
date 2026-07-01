@@ -1173,3 +1173,901 @@ tr.budget-negative .remaining-cell {
   }
 }
 
+/* ==========================================
+   Investment Tracker Styling
+   ========================================== */
+.investment-tracker-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.investment-row-1 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.7fr);
+  gap: 24px;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.investment-row-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.7fr);
+  gap: 24px;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.investment-row-3 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 0.8fr);
+  gap: 24px;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.investment-row-4 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr);
+  gap: 24px;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Panel-specific styling */
+.investment-dashboard-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.investment-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.investment-metric-card {
+  padding: 14px 16px;
+  background: #f8faf7;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.investment-metric-card span {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.investment-metric-card strong {
+  font-size: 18px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.investment-metric-card strong.green {
+  color: var(--green);
+}
+
+.profit-badge {
+  font-size: 11px;
+  background: #e6f4ea;
+  color: #137333;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: bold;
+  margin-left: 2px;
+}
+
+.dashboard-charts-grid {
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: 20px;
+  align-items: stretch;
+  flex-grow: 1;
+}
+
+.chart-box {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chart-box h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Donut Chart Styling */
+.donut-chart-wrapper {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  margin: 0 auto;
+}
+
+.donut-chart-wrapper.large-donut {
+  width: 150px;
+  height: 150px;
+}
+
+.donut-svg {
+  transform: rotate(-90deg);
+  width: 100%;
+  height: 100%;
+}
+
+.donut-center-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.donut-center-text .donut-val {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.donut-center-text .donut-lbl {
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.allocation-legend {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  font-size: 11px;
+}
+
+.legend-color-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+
+/* Line Chart Styling */
+.chart-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.small-select {
+  min-height: 28px;
+  height: 28px;
+  padding: 2px 6px;
+  font-size: 11px;
+  width: auto;
+  border-radius: 4px;
+  background: #f8faf7;
+}
+
+.line-chart-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  justify-content: space-between;
+}
+
+.growth-line-svg {
+  width: 100%;
+  height: 100px;
+}
+
+.x-axis-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--muted);
+  padding: 4px 6px 0;
+}
+
+/* Optional fields styling */
+.optional-fields-container {
+  border: 1px dashed #efcbb3;
+  background: #fdfaf2;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.optional-fields-header {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--gold);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+/* Investment Category Breakdown */
+.investment-category-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.investment-category-panel .category-chart-box {
+  flex-grow: 1;
+}
+
+.category-chart-box {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.category-breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-grow: 1;
+}
+
+.breakdown-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #f8faf7;
+}
+
+.breakdown-row:last-child {
+  border-bottom: none;
+}
+
+.breakdown-row .cat-name {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.breakdown-row .cat-amount {
+  font-weight: 700;
+  text-align: right;
+}
+
+.breakdown-row .cat-pct {
+  color: var(--muted);
+  width: 40px;
+  text-align: right;
+}
+
+/* Quick Summary Panel */
+.summary-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.summary-card {
+  padding: 12px 14px;
+  background: #f8faf7;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.summary-card .card-icon {
+  font-size: 22px;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+
+.card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card-details span {
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.card-details strong {
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.card-details small {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* Responsive Overrides */
+@media (max-width: 1200px) {
+  .investment-row-1,
+  .investment-row-2,
+  .investment-row-3,
+  .investment-row-4 {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .investment-metrics-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .dashboard-charts-grid {
+    grid-template-columns: 1fr;
+  }
+  .summary-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Scrollbars and action buttons styling */
+.table-wrap::-webkit-scrollbar {
+  height: 6px;
+}
+.table-wrap::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+.table-wrap::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+.table-wrap::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Force panel container containment and scrolling */
+.investment-tracker-layout .panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.investment-tracker-layout .table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  display: block;
+}
+
+.investment-list-panel table {
+  min-width: 950px;
+}
+
+.maturity-panel table,
+.sip-tracker-panel table,
+.recent-transactions-panel table {
+  min-width: 600px;
+}
+
+.icon-action-btn {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+
+.icon-action-btn:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.icon-action-btn.edit {
+  color: var(--muted);
+}
+
+.icon-action-btn.delete {
+  color: var(--red);
+}
+
+.icon-action-btn.view {
+  color: var(--teal);
+}
+
+.primary-button, .ghost-button {
+  white-space: nowrap;
+}
+
+/* Premium Investment layout and components styling */
+.investment-metrics-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.investment-metrics-row .investment-metric-card {
+  padding: 16px;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.investment-metrics-row .investment-metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+}
+
+.investment-metrics-row .metric-title {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.investment-metrics-row .investment-metric-card strong {
+  font-size: 20px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.investment-metrics-row .metric-subtitle {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* 3-Column Form Grid */
+.investment-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 0.9fr);
+  gap: 24px;
+  align-items: stretch;
+  margin-bottom: 24px;
+}
+
+/* Type Selection Cards */
+.type-selection-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+  margin-bottom: 16px;
+}
+
+.type-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  background: var(--bg-card, #ffffff);
+  transition: all 0.2s ease-in-out;
+}
+
+.type-card:hover {
+  border-color: var(--green);
+  background: rgba(47, 125, 87, 0.02);
+}
+
+.type-card.active {
+  border-color: var(--green);
+  background: rgba(47, 125, 87, 0.04);
+}
+
+.type-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.type-card strong {
+  display: block;
+  font-size: 13px;
+  color: var(--ink);
+  margin-bottom: 1px;
+}
+
+.type-card p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Small custom radio button */
+.type-card input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  min-height: 14px;
+  border: 2px solid #ccc;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+  margin-left: auto;
+  position: relative;
+}
+
+.type-card input[type="radio"]:checked {
+  border-color: var(--green);
+  background: radial-gradient(circle, var(--green) 45%, transparent 46%);
+}
+
+.type-card input[type="radio"]:hover {
+  border-color: var(--green);
+}
+
+/* How Monthly Works Info Block */
+.how-monthly-works-box {
+  background: #e6f4ea;
+  border: 1px solid #a3cfb6;
+  border-radius: 10px;
+  padding: 14px;
+  color: #137333;
+  font-size: 12px;
+  margin-top: 16px;
+}
+
+.how-monthly-works-box .works-header {
+  font-weight: 700;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.how-monthly-works-box ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.how-monthly-works-box li {
+  line-height: 1.4;
+}
+
+/* Tabs inside Add Investment form */
+.form-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.form-tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 4px 10px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.form-tab-btn:hover {
+  color: var(--ink);
+}
+
+.form-tab-btn.active {
+  color: var(--green);
+  border-bottom-color: var(--green);
+}
+
+/* Schedule Preview and Table elements */
+.schedule-preview-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.schedule-intro-msg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 200px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 24px;
+}
+
+.schedule-table-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.schedule-summary-footer {
+  margin-top: auto;
+  border-top: 2px solid var(--line);
+  padding-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.schedule-summary-footer .summary-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.schedule-summary-footer .summary-line strong {
+  color: var(--ink);
+}
+
+/* List and Payment Summary Grid */
+.investment-list-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.6fr);
+  gap: 24px;
+  align-items: stretch;
+  margin-bottom: 24px;
+}
+
+.list-filters-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.list-filters {
+  display: flex;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 4px;
+  border-radius: 8px;
+  gap: 4px;
+}
+
+.filter-tab {
+  background: transparent;
+  border: none;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filter-tab:hover {
+  color: var(--ink);
+}
+
+.filter-tab.active {
+  background: #ffffff;
+  color: var(--green);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Payment Summary Widget */
+.payment-summary-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.payment-summary-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+}
+
+.payment-donut-box {
+  margin-bottom: 16px;
+}
+
+.medium-donut {
+  width: 100px;
+  height: 100px;
+}
+
+.payment-summary-legend {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted);
+  padding: 2px 0;
+}
+
+.legend-row strong {
+  color: var(--ink);
+}
+
+.legend-row.border-top {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.legend-color-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+/* Badges for schedule and list */
+.emi-badge.paid {
+  background-color: #e6f4ea;
+  color: #137333;
+}
+
+.emi-badge.pending {
+  background-color: #fef7e0;
+  color: #b06000;
+}
+
+/* Analytics section header */
+.analytics-header-section {
+  border-bottom: 2px solid var(--line);
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+
+.analytics-header-section h3 {
+  font-size: 16px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* Layout overrides */
+@media (max-width: 1200px) {
+  .investment-form-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .investment-list-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .investment-metrics-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .investment-metrics-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Dashboard Row: Portfolio Allocation + Portfolio Growth side by side */
+.investment-dashboard-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+  gap: 24px;
+  align-items: stretch;
+  margin-bottom: 24px;
+}
+
+.investment-dashboard-panel .dashboard-charts-grid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Mini metric cards below the growth chart */
+.growth-mini-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.mini-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  background: var(--bg-page, #f4f6f3);
+  border-radius: 8px;
+}
+
+.mini-metric-title {
+  font-size: 9px;
+  color: var(--muted);
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.mini-metric-card strong {
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.mini-metric-sub {
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.growth-chart-panel-analytics {
+  min-height: 200px;
+}
+
+@media (max-width: 1200px) {
+  .investment-dashboard-row {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .growth-mini-metrics {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .growth-mini-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+

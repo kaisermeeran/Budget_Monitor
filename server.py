@@ -163,6 +163,35 @@ def init_db():
             cur.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_transactions_state_id ON transactions(state_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_transactions_category_id ON transactions(category_id)")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS investments (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    state_id TEXT,
+                    name TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    invested_amount NUMERIC(12,2) NOT NULL,
+                    current_value NUMERIC(12,2) NOT NULL,
+                    investment_date DATE NOT NULL,
+                    maturity_date DATE,
+                    interest_percent NUMERIC(5,2),
+                    interest_period TEXT,
+                    sip_amount NUMERIC(12,2),
+                    notes TEXT,
+                    status TEXT DEFAULT 'Active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_investments_user_id ON investments(user_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_investments_state_id ON investments(state_id)")
+            cur.execute("ALTER TABLE investments ADD COLUMN IF NOT EXISTS investment_style TEXT DEFAULT 'one-time'")
+            cur.execute("ALTER TABLE investments ADD COLUMN IF NOT EXISTS monthly_amount NUMERIC(12,2)")
+            cur.execute("ALTER TABLE investments ADD COLUMN IF NOT EXISTS total_investment NUMERIC(12,2)")
+            cur.execute("ALTER TABLE investments ADD COLUMN IF NOT EXISTS expected_duration INTEGER")
+            cur.execute("ALTER TABLE investments ADD COLUMN IF NOT EXISTS expected_duration_unit TEXT")
+            cur.execute("ALTER TABLE investments ADD COLUMN IF NOT EXISTS expected_return_percent NUMERIC(5,2)")
+            cur.execute("ALTER TABLE investments ADD COLUMN IF NOT EXISTS interest_calculation TEXT")
+            cur.execute("ALTER TABLE investments ADD COLUMN IF NOT EXISTS paid_months TEXT DEFAULT '{}'")
         conn.commit()
 
 
@@ -1076,8 +1105,10 @@ class BudgetHandler(SimpleHTTPRequestHandler):
                 sync_state = payload.get("state") or {}
                 plans = sync_state.get("plans") or {}
                 transactions = sync_state.get("transactions") or []
+                investments = sync_state.get("investments") or []
                 category_count = 0
                 transaction_count = 0
+                investment_count = 0
 
                 with WRITE_LOCK:
                     with connect() as conn:
@@ -1284,12 +1315,184 @@ class BudgetHandler(SimpleHTTPRequestHandler):
                                     "DELETE FROM transactions WHERE user_id = %s",
                                     (user["id"],)
                                 )
+
+                            # 3. Fetch and cache all investments for the user
+                            cur.execute(
+                                """
+                                SELECT id, state_id, name, type, invested_amount, current_value, 
+                                       investment_date, maturity_date, interest_percent, interest_period, 
+                                       sip_amount, notes, status, investment_style, monthly_amount,
+                                       total_investment, expected_duration, expected_duration_unit,
+                                       expected_return_percent, interest_calculation, paid_months
+                                FROM investments
+                                WHERE user_id = %s
+                                """,
+                                (user["id"],)
+                            )
+                            db_investments = cur.fetchall()
+                            inv_by_state = {
+                                inv[1]: inv for inv in db_investments if inv[1]
+                            }
+
+                            processed_inv_ids = []
+
+                            for inv in investments:
+                                name = str(inv.get("name") or "").strip()
+                                inv_type = str(inv.get("type") or "Mutual Fund").strip()
+                                invested_amount = inv.get("investedAmount")
+                                current_value = inv.get("currentValue")
+                                investment_date = inv.get("investmentDate")
+                                state_id = inv.get("id")
+
+                                if not name or invested_amount is None or current_value is None or not investment_date:
+                                    continue
+
+                                # Optional values
+                                maturity_date = inv.get("maturityDate") or None
+                                if maturity_date == "":
+                                    maturity_date = None
+                                interest_percent = inv.get("interestPercent")
+                                if interest_percent == "" or interest_percent is None:
+                                    interest_percent = None
+                                interest_period = inv.get("interestPeriod") or "Yearly"
+                                sip_amount = inv.get("sipAmount")
+                                if sip_amount == "" or sip_amount is None:
+                                    sip_amount = None
+                                notes = inv.get("notes") or ""
+                                status = inv.get("status") or "Active"
+
+                                # New monthly recurring fields
+                                investment_style = str(inv.get("investmentStyle") or "one-time").strip()
+                                monthly_amount = inv.get("monthlyAmount")
+                                if monthly_amount == "" or monthly_amount is None:
+                                    monthly_amount = None
+                                total_investment = inv.get("totalInvestment")
+                                if total_investment == "" or total_investment is None:
+                                    total_investment = None
+                                expected_duration = inv.get("expectedDuration")
+                                if expected_duration == "" or expected_duration is None:
+                                    expected_duration = None
+                                expected_duration_unit = str(inv.get("expectedDurationUnit") or "Months").strip()
+                                expected_return_percent = inv.get("expectedReturnPercent")
+                                if expected_return_percent == "" or expected_return_percent is None:
+                                    expected_return_percent = None
+                                interest_calculation = str(inv.get("interestCalculation") or "Monthly Compounding").strip()
+                                paid_months_val = inv.get("paidMonths") or {}
+                                paid_months_str = json.dumps(paid_months_val)
+
+                                existing_inv_id = None
+                                needs_update = False
+
+                                if state_id and state_id in inv_by_state:
+                                    db_inv = inv_by_state[state_id]
+                                    existing_inv_id = db_inv[0]
+                                    
+                                    db_inv_date = db_inv[6].isoformat() if db_inv[6] else None
+                                    db_mat_date = db_inv[7].isoformat() if db_inv[7] else None
+                                    
+                                    def float_eq(v1, v2):
+                                        if v1 is None and v2 is None:
+                                            return True
+                                        if v1 is None or v2 is None:
+                                            return False
+                                        return abs(float(v1) - float(v2)) < 0.001
+
+                                    if (db_inv[2] != name or
+                                        db_inv[3] != inv_type or
+                                        not float_eq(db_inv[4], invested_amount) or
+                                        not float_eq(db_inv[5], current_value) or
+                                        db_inv_date != investment_date or
+                                        db_mat_date != maturity_date or
+                                        not float_eq(db_inv[8], interest_percent) or
+                                        db_inv[9] != interest_period or
+                                        not float_eq(db_inv[10], sip_amount) or
+                                        (db_inv[11] or "") != notes or
+                                        db_inv[12] != status or
+                                        db_inv[13] != investment_style or
+                                        not float_eq(db_inv[14], monthly_amount) or
+                                        not float_eq(db_inv[15], total_investment) or
+                                        db_inv[16] != expected_duration or
+                                        db_inv[17] != expected_duration_unit or
+                                        not float_eq(db_inv[18], expected_return_percent) or
+                                        db_inv[19] != interest_calculation or
+                                        db_inv[20] != paid_months_str):
+                                        needs_update = True
+
+                                if existing_inv_id:
+                                    if needs_update:
+                                        cur.execute(
+                                            """
+                                            UPDATE investments
+                                            SET name = %s,
+                                                type = %s,
+                                                invested_amount = %s,
+                                                current_value = %s,
+                                                investment_date = %s,
+                                                maturity_date = %s,
+                                                interest_percent = %s,
+                                                interest_period = %s,
+                                                sip_amount = %s,
+                                                notes = %s,
+                                                status = %s,
+                                                investment_style = %s,
+                                                monthly_amount = %s,
+                                                total_investment = %s,
+                                                expected_duration = %s,
+                                                expected_duration_unit = %s,
+                                                expected_return_percent = %s,
+                                                interest_calculation = %s,
+                                                paid_months = %s
+                                            WHERE id = %s
+                                            """,
+                                            (name, inv_type, invested_amount, current_value, investment_date, 
+                                             maturity_date, interest_percent, interest_period, sip_amount, 
+                                             notes, status, investment_style, monthly_amount, total_investment,
+                                             expected_duration, expected_duration_unit, expected_return_percent,
+                                             interest_calculation, paid_months_str, existing_inv_id)
+                                        )
+                                    processed_inv_ids.append(existing_inv_id)
+                                else:
+                                    cur.execute(
+                                        """
+                                        INSERT INTO investments
+                                        (user_id, state_id, name, type, invested_amount, current_value, 
+                                         investment_date, maturity_date, interest_percent, interest_period, 
+                                         sip_amount, notes, status, investment_style, monthly_amount,
+                                         total_investment, expected_duration, expected_duration_unit,
+                                         expected_return_percent, interest_calculation, paid_months)
+                                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                        RETURNING id
+                                        """,
+                                        (user["id"], state_id, name, inv_type, invested_amount, current_value, 
+                                         investment_date, maturity_date, interest_percent, interest_period, 
+                                         sip_amount, notes, status, investment_style, monthly_amount,
+                                         total_investment, expected_duration, expected_duration_unit,
+                                         expected_return_percent, interest_calculation, paid_months_str)
+                                    )
+                                    new_inv_id = cur.fetchone()[0]
+                                    processed_inv_ids.append(new_inv_id)
+
+                                investment_count += 1
+
+                            # Reconcile investments
+                            if processed_inv_ids:
+                                cur.execute(
+                                    "DELETE FROM investments WHERE user_id = %s AND NOT (id = ANY(%s))",
+                                    (user["id"], processed_inv_ids)
+                                )
+                            else:
+                                cur.execute(
+                                    "DELETE FROM investments WHERE user_id = %s",
+                                    (user["id"],)
+                                )
+
                             conn.commit()
 
                 self.send_json({
                     "ok": True,
                     "categories": category_count,
-                    "transactions": transaction_count
+                    "transactions": transaction_count,
+                    "investments": investment_count
                 })
                 return
 

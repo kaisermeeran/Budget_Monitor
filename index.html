@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Budget Monitor</title>
-  <link rel="stylesheet" href="styles.css?v=20260625-emi-planner-prod">
+  <link rel="stylesheet" href="styles.css?v=20260626-fixed-design-v5">
 </head>
 <body>
   <div id="authContainer" class="auth-container">
@@ -74,12 +74,21 @@
       <section class="month-panel" aria-label="Month controls">
         <label for="monthSelect">Month</label>
         <input id="monthSelect" type="month">
+        <script>
+          (function(){
+            var now = new Date();
+            var m = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+            document.getElementById('monthSelect').value = m;
+          })();
+        </script>
       </section>
+
 
       <nav class="view-tabs" aria-label="Views">
         <button class="tab-button active" data-view="overview" type="button">Overview</button>
         <button class="tab-button" data-view="transactions" type="button">Transactions</button>
         <button class="tab-button" data-view="emiPlanner" type="button">EMI Planner</button>
+        <button class="tab-button" data-view="investmentTracker" type="button">Investment Tracker</button>
         <button class="tab-button" data-view="reports" type="button">Reports</button>
         <button class="tab-button" data-view="goals" type="button">Goals</button>
       </nav>
@@ -686,8 +695,572 @@
 
         </div>
       </section>
+
+      <!-- Investment Tracker View -->
+      <section id="investmentTrackerView" class="view" aria-label="Investment Tracker">
+        <div class="investment-tracker-layout">
+
+          <!-- ── Row 1: 5 Metric Cards ── -->
+          <div class="investment-metrics-row">
+            <div class="investment-metric-card">
+              <span class="metric-title">TOTAL INVESTMENT</span>
+              <strong id="invTotalInvestment">₹0</strong>
+              <span class="metric-subtitle">Total Amount Invested</span>
+            </div>
+            <div class="investment-metric-card">
+              <span class="metric-title">CURRENT VALUE</span>
+              <strong id="invCurrentValue">₹0</strong>
+              <span class="metric-subtitle">Total Current Value</span>
+            </div>
+            <div class="investment-metric-card">
+              <span class="metric-title">TOTAL PROFIT</span>
+              <strong id="invTotalProfit" style="color: var(--green);">₹0 <span class="profit-badge" id="invProfitBadge"></span></strong>
+              <span class="metric-subtitle">Total Profit / Gain</span>
+            </div>
+            <div class="investment-metric-card">
+              <span class="metric-title">ANNUAL RETURN</span>
+              <strong id="invAnnualReturn">0.0%</strong>
+              <span class="metric-subtitle">Weighted Return</span>
+            </div>
+            <div class="investment-metric-card">
+              <span class="metric-title">UPCOMING MATURITY</span>
+              <strong id="invUpcomingMaturity">0</strong>
+              <span class="metric-subtitle">Next 30 Days</span>
+            </div>
+          </div>
+
+          <!-- ── Row 2: Dashboard Charts (Portfolio Allocation + Portfolio Growth) ── -->
+          <div class="investment-dashboard-row">
+            <!-- Portfolio Allocation Donut -->
+            <section class="panel investment-dashboard-panel">
+              <div class="panel-header">
+                <h3>Portfolio Allocation</h3>
+              </div>
+              <div class="dashboard-charts-grid">
+                <div class="chart-box">
+                  <div class="donut-chart-wrapper">
+                    <svg class="donut-svg" id="allocationDonutSvg" viewBox="0 0 36 36">
+                      <circle cx="18" cy="18" r="15.915" fill="none" stroke="#e8eee9" stroke-width="4"></circle>
+                    </svg>
+                    <div class="donut-center-text">
+                      <span class="donut-val" id="allocationDonutVal">₹0</span>
+                      <span class="donut-lbl">Value</span>
+                    </div>
+                  </div>
+                  <div class="allocation-legend" id="allocationLegend">
+                    <!-- Populated dynamically -->
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Portfolio Growth Chart -->
+            <section class="panel growth-chart-panel">
+              <div class="panel-header">
+                <div class="chart-title-row" style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+                  <h3>Portfolio Growth (This Year)</h3>
+                  <select id="invGrowthRange" class="small-select">
+                    <option value="year">This Year</option>
+                    <option value="all">All Time</option>
+                  </select>
+                </div>
+              </div>
+              <div class="line-chart-wrapper" id="growthChartWrapper">
+                <!-- SVG growth line chart populated dynamically -->
+              </div>
+              <!-- Mini metrics under the chart -->
+              <div class="growth-mini-metrics" id="growthMiniMetrics">
+                <div class="mini-metric-card">
+                  <span class="mini-metric-title">TOTAL INVESTMENT</span>
+                  <strong id="gmmTotalInvestment">₹0</strong>
+                  <span class="mini-metric-sub">Total Amount Invested</span>
+                </div>
+                <div class="mini-metric-card">
+                  <span class="mini-metric-title">CURRENT VALUE</span>
+                  <strong id="gmmCurrentValue">₹0</strong>
+                  <span class="mini-metric-sub">Total Current Value</span>
+                </div>
+                <div class="mini-metric-card">
+                  <span class="mini-metric-title">TOTAL PROFIT</span>
+                  <strong id="gmmTotalProfit" style="color:var(--green);">₹0</strong>
+                  <span class="mini-metric-sub">Total Profit / Gain</span>
+                </div>
+                <div class="mini-metric-card">
+                  <span class="mini-metric-title">ANNUAL RETURN</span>
+                  <strong id="gmmAnnualReturn">0.0%</strong>
+                  <span class="mini-metric-sub">Weighted Return</span>
+                </div>
+                <div class="mini-metric-card">
+                  <span class="mini-metric-title">UPCOMING MATURITY</span>
+                  <strong id="gmmUpcomingMaturity">0</strong>
+                  <span class="mini-metric-sub">Next 30 Days</span>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- ── Row 3: 3-Column Form Grid ── -->
+          <div class="investment-form-grid">
+
+            <!-- 1. Select Investment Type -->
+            <section class="panel select-type-panel">
+              <div class="panel-header">
+                <h3>1. Select Investment Type</h3>
+              </div>
+              <div class="type-selection-cards">
+                <div class="type-card active" id="typeCardOneTime">
+                  <span class="type-icon">💵</span>
+                  <div>
+                    <strong>One Time Investment</strong>
+                    <p>Invest once and let it grow</p>
+                  </div>
+                  <input type="radio" name="invStyleRadio" id="radioOneTime" checked style="margin-left:auto;">
+                </div>
+                <div class="type-card" id="typeCardRecurring">
+                  <span class="type-icon">📅</span>
+                  <div>
+                    <strong>Monthly Investment (Recurring)</strong>
+                    <p>Invest monthly like LIC, SIP, etc.</p>
+                  </div>
+                  <input type="radio" name="invStyleRadio" id="radioRecurring" style="margin-left:auto;">
+                </div>
+              </div>
+              <div class="how-monthly-works-box">
+                <div class="works-header">
+                  <span class="icon">📝</span> How Monthly Investment Works?
+                </div>
+                <ul>
+                  <li>✓ You invest a fixed amount every month.</li>
+                  <li>✓ System will track each monthly payment.</li>
+                  <li>✓ Shows total paid, remaining, and next due date.</li>
+                  <li>✓ Helps you track maturity and returns (if applicable).</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- 2. Add/Edit Investment Form -->
+            <section class="panel add-investment-panel">
+              <div class="panel-header">
+                <h3 id="formPanelTitle">2. Add New Investment</h3>
+              </div>
+              <div class="form-tabs">
+                <button class="form-tab-btn active" id="btnTabBasic" type="button">Basic Details</button>
+                <button class="form-tab-btn" id="btnTabMaturity" type="button">Maturity &amp; Returns (Optional)</button>
+              </div>
+
+              <form id="addInvestmentForm" class="balance-form">
+                <input type="hidden" id="invEditingId">
+                <input type="hidden" id="invStyleInput" value="one-time">
+
+                <!-- Tab 1: Basic Details -->
+                <div class="tab-content" id="tabContentBasic">
+                  <div class="form-grid-2">
+                    <label>
+                      Investment Name *
+                      <input type="text" id="invNameInput" placeholder="e.g. LIC Premium Plan" required>
+                    </label>
+                    <label>
+                      Investment Type *
+                      <select id="invTypeSelect" required>
+                        <option value="Mutual Fund">Mutual Fund</option>
+                        <option value="Stocks">Stocks</option>
+                        <option value="FD">Fixed Deposit</option>
+                        <option value="RD">Recurring Deposit (RD)</option>
+                        <option value="Gold">Gold</option>
+                        <option value="Crypto">Crypto</option>
+                        <option value="PPF">PPF</option>
+                        <option value="Insurance - LIC">Insurance - LIC</option>
+                        <option value="SIP">SIP</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <!-- One-Time Fields -->
+                  <div class="one-time-inputs">
+                    <div class="form-grid-2">
+                      <label>
+                        Invested Amount *
+                        <input type="number" id="invInvestedAmountInput" placeholder="₹ 1,00,000">
+                      </label>
+                      <label>
+                        Current Value *
+                        <input type="number" id="invCurrentValueInput" placeholder="₹ 1,06,500">
+                      </label>
+                    </div>
+                    <div class="form-grid-2">
+                      <label>
+                        Investment Date *
+                        <input type="date" id="invDateInput">
+                      </label>
+                      <label>
+                        Maturity Date
+                        <input type="date" id="invMaturityDateInput">
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Recurring Fields -->
+                  <div class="recurring-inputs" style="display:none;">
+                    <div class="form-grid-2">
+                      <label>
+                        Monthly Amount *
+                        <input type="number" id="invMonthlyAmountInput" placeholder="₹ 1,500">
+                      </label>
+                      <label>
+                        Start Date *
+                        <input type="date" id="invStartDateInput">
+                      </label>
+                    </div>
+                    <div class="form-grid-2">
+                      <label>
+                        Expected Duration *
+                        <div class="duration-input-group" style="display:flex;gap:8px;">
+                          <input type="number" id="invExpectedDurationInput" placeholder="66" style="flex:1;">
+                          <select id="invExpectedDurationUnitSelect" style="width:90px;min-width:90px;">
+                            <option value="Months" selected>Months</option>
+                            <option value="Years">Years</option>
+                          </select>
+                        </div>
+                      </label>
+                      <label>
+                        Notes (Optional)
+                        <input type="text" id="invNotesInput" placeholder="Add notes here">
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Tab 2: Maturity & Returns -->
+                <div class="tab-content" id="tabContentMaturity" style="display:none;">
+                  <!-- One-Time Optional -->
+                  <div class="one-time-optional-inputs">
+                    <div class="form-grid-2">
+                      <label>
+                        Interest % (Optional)
+                        <input type="number" step="0.01" id="invInterestPercentInput" placeholder="6.5">
+                      </label>
+                      <label>
+                        Interest Period (Optional)
+                        <select id="invInterestPeriodSelect">
+                          <option value="Yearly" selected>Yearly</option>
+                          <option value="Monthly">Monthly</option>
+                          <option value="Quarterly">Quarterly</option>
+                          <option value="Half-Yearly">Half-Yearly</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div class="form-grid-2" style="margin-top:10px;">
+                      <label>
+                        Monthly SIP Amount (Optional)
+                        <input type="number" id="invSipAmountInput" placeholder="₹ 5,000">
+                      </label>
+                      <label>
+                        Notes (Optional)
+                        <input type="text" id="invNotesInputOneTime" placeholder="Add notes here">
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Recurring Optional -->
+                  <div class="recurring-optional-inputs" style="display:none;">
+                    <div class="form-grid-2">
+                      <label>
+                        Total Investment Target (Optional)
+                        <input type="number" id="invTotalInvestmentInput" placeholder="₹ 1,00,000">
+                      </label>
+                      <label>
+                        Expected Return % (Optional)
+                        <input type="number" step="0.01" id="invExpectedReturnPercentInput" placeholder="8.00">
+                      </label>
+                    </div>
+                    <div class="form-grid-2" style="margin-top:10px;">
+                      <label>
+                        Interest Calculation (Optional)
+                        <select id="invInterestCalculationSelect">
+                          <option value="Monthly Compounding" selected>Monthly Compounding</option>
+                          <option value="Yearly Compounding">Yearly Compounding</option>
+                          <option value="Quarterly Compounding">Quarterly Compounding</option>
+                          <option value="Half-Yearly Compounding">Half-Yearly Compounding</option>
+                          <option value="Simple Interest">Simple Interest</option>
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-actions" style="margin-top:20px;">
+                  <button type="submit" class="primary-button" style="background:var(--green);white-space:nowrap;">Save Investment</button>
+                  <button type="button" id="btnResetForm" class="ghost-button">Reset</button>
+                </div>
+              </form>
+            </section>
+
+            <!-- 3. Monthly Payment Schedule Preview -->
+            <section class="panel schedule-preview-panel">
+              <div class="panel-header">
+                <h3 id="schedulePanelTitle">3. Monthly Payment Schedule Preview</h3>
+              </div>
+              <div class="schedule-intro-msg" id="scheduleIntroMsg">
+                <p>ℹ️ Select a Monthly Recurring Investment or fill the form details to view the payment schedule preview.</p>
+              </div>
+              <div class="schedule-table-container" id="scheduleTableContainer" style="display:none;">
+                <div class="table-wrap" style="max-height:250px;overflow-y:auto;">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Due Date</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="schedulePreviewBody">
+                      <!-- Populated dynamically -->
+                    </tbody>
+                  </table>
+                </div>
+                <div class="schedule-summary-footer">
+                  <div class="summary-line">
+                    <span>Total Amount:</span>
+                    <strong id="scheduleTotalAmt">₹0</strong>
+                  </div>
+                  <div class="summary-line">
+                    <span>Paid Amount:</span>
+                    <strong id="schedulePaidAmt" class="green">₹0</strong>
+                  </div>
+                  <div class="summary-line">
+                    <span>Remaining Amount:</span>
+                    <strong id="scheduleRemainingAmt" class="red">₹0</strong>
+                  </div>
+                  <div class="summary-line">
+                    <span>Next Due Date:</span>
+                    <strong id="scheduleNextDue">-</strong>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- ── Row 4: Investment List + Payment Summary ── -->
+          <div class="investment-list-grid">
+            <!-- 4. Investment List -->
+            <section class="panel investment-list-panel">
+              <div class="panel-header">
+                <h3>4. Investment List</h3>
+                <div class="list-filters-container">
+                  <div class="list-filters">
+                    <button class="filter-tab active" data-filter="all" type="button">All</button>
+                    <button class="filter-tab" data-filter="one-time" type="button">One Time</button>
+                    <button class="filter-tab" data-filter="recurring" type="button">Monthly (Recurring)</button>
+                    <button class="filter-tab" data-filter="sip" type="button">SIP</button>
+                  </div>
+                  <button class="primary-button" id="addNewInvestmentScrollBtn" type="button">+ Add Investment</button>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Investment Name</th>
+                      <th>Type</th>
+                      <th>Monthly Amount</th>
+                      <th>Total Invested</th>
+                      <th>Total Paid</th>
+                      <th>Remaining</th>
+                      <th>Next Due Date</th>
+                      <th>Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="investmentListBody">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- 5. Payment Summary Widget -->
+            <section class="panel payment-summary-panel" id="paymentSummaryWidget" style="display:none;">
+              <div class="panel-header">
+                <h3 id="paymentSummaryTitle">5. Payment Summary</h3>
+              </div>
+              <div class="payment-summary-content">
+                <div class="payment-donut-box">
+                  <div class="donut-chart-wrapper medium-donut">
+                    <svg class="donut-svg" id="summaryDonutSvg" viewBox="0 0 36 36">
+                      <!-- Dynamic circle fills -->
+                    </svg>
+                    <div class="donut-center-text">
+                      <span class="donut-val" id="summaryPaidPercent">0%</span>
+                      <span class="donut-lbl">Paid</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="payment-summary-legend">
+                  <div class="legend-row">
+                    <span><span class="legend-color-dot" style="background:var(--green);"></span> Paid Amount</span>
+                    <strong id="summaryPaidAmt">₹0 (0%)</strong>
+                  </div>
+                  <div class="legend-row">
+                    <span><span class="legend-color-dot" style="background:#e8eee9;"></span> Remaining Amount</span>
+                    <strong id="summaryRemainingAmt">₹0 (0%)</strong>
+                  </div>
+                  <div class="legend-row border-top">
+                    <span>Total Investment</span>
+                    <strong id="summaryTotalInvestment">₹0</strong>
+                  </div>
+                  <div class="legend-row">
+                    <span>Next Due Date</span>
+                    <strong id="summaryNextDueDate">-</strong>
+                  </div>
+                  <div class="legend-row">
+                    <span>Installments Paid</span>
+                    <strong id="summaryInstallmentsCount">0 of 0</strong>
+                  </div>
+                </div>
+                <button type="button" class="primary-button outline-btn" id="btnViewHistory" style="margin-top:15px;width:100%;border:1px solid var(--green);background:transparent;color:var(--green);cursor:pointer;">View Full Payment History</button>
+              </div>
+            </section>
+          </div>
+
+          <!-- ── Analytics Section ── -->
+          <div class="analytics-header-section" style="margin-top:20px;">
+            <h3>📊 Portfolio Analytics &amp; Dashboard</h3>
+          </div>
+
+          <div class="investment-row-2">
+            <!-- Portfolio Allocation & Category Breakdown -->
+            <section class="panel investment-category-panel">
+              <div class="panel-header">
+                <h3>Portfolio Allocation &amp; Category Breakdown</h3>
+              </div>
+              <div class="category-chart-box">
+                <div class="donut-chart-wrapper large-donut">
+                  <svg class="donut-svg" viewBox="0 0 36 36">
+                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#e8eee9" stroke-width="4"></circle>
+                  </svg>
+                  <div class="donut-center-text">
+                    <span class="donut-val" id="catTotalValue" style="font-size:14px;">₹0</span>
+                    <span class="donut-lbl">Total Value</span>
+                  </div>
+                </div>
+                <div class="category-breakdown-list">
+                  <!-- Populated dynamically -->
+                </div>
+              </div>
+            </section>
+
+            <!-- Growth Chart (Analytics) -->
+            <section class="panel growth-chart-panel-analytics">
+              <div class="panel-header">
+                <h3>Growth Overview</h3>
+              </div>
+              <div class="line-chart-wrapper" id="analyticsGrowthChartWrapper">
+                <!-- SVG growth line chart populated dynamically -->
+              </div>
+            </section>
+          </div>
+
+          <div class="investment-row-3">
+            <!-- Upcoming Maturity -->
+            <section class="panel maturity-panel">
+              <div class="panel-header">
+                <h3>Upcoming Maturity</h3>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Investment Name</th>
+                      <th>Type</th>
+                      <th>Maturity Date</th>
+                      <th>Days Left</th>
+                      <th>Maturity Amount (Est.)</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="maturityListBody">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- Monthly SIP Tracker -->
+            <section class="panel sip-tracker-panel">
+              <div class="panel-header">
+                <h3>Monthly SIP Tracker</h3>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>SIP Name</th>
+                      <th>Amount</th>
+                      <th>Next SIP Date</th>
+                      <th>Frequency</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sipTrackerListBody">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- Investment Impact on Budget -->
+            <section class="panel budget-impact-panel">
+              <div class="panel-header">
+                <h3>Investment Impact on Budget</h3>
+              </div>
+              <div class="emi-impact-list" id="invBudgetImpactList">
+                <!-- Populated dynamically -->
+              </div>
+            </section>
+          </div>
+
+          <div class="investment-row-4">
+            <!-- Recent Transactions -->
+            <section class="panel recent-transactions-panel">
+              <div class="panel-header">
+                <h3>Recent Transactions</h3>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Investment</th>
+                      <th>Type</th>
+                      <th>Amount</th>
+                      <th>Units</th>
+                      <th>Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recentInvTransactionsBody">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- Quick Summary -->
+            <section class="panel quick-summary-panel">
+              <div class="panel-header">
+                <h3>Quick Summary</h3>
+              </div>
+              <div class="summary-cards-grid" id="invQuickSummaryGrid">
+                <!-- Populated dynamically -->
+              </div>
+            </section>
+          </div>
+
+
     </section>
   </main>
+          <div class="investment-row-1">
 
   <template id="goalTemplate">
     <article class="goal-card">
@@ -702,6 +1275,6 @@
     </article>
   </template>
 
-  <script src="app.js?v=20260625-emi-planner-prod"></script>
+  <script src="app.js?v=20260701-monthly-investment-v1"></script>
 </body>
 </html>
