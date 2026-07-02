@@ -58,6 +58,14 @@ const els = {
   emptyIncome: document.querySelector("#emptyIncome"),
   budgetForm: document.querySelector("#budgetForm"),
   budgetNameInput: document.querySelector("#budgetNameInput"),
+  budgetReminderToggle: document.querySelector("#budgetReminderToggle"),
+  reminderFieldsContainer: document.querySelector("#reminderFieldsContainer"),
+  reminderCategory: document.querySelector("#reminderCategory"),
+  reminderDueDate: document.querySelector("#reminderDueDate"),
+  reminderRecurring: document.querySelector("#reminderRecurring"),
+  reminderBefore: document.querySelector("#reminderBefore"),
+  upcomingRemindersTableBody: document.querySelector("#upcomingRemindersTableBody"),
+  emptyRemindersMsg: document.querySelector("#emptyRemindersMsg"),
   budgetSuggestionList: document.querySelector("#budgetSuggestionList"),
   budgetAmountInput: document.querySelector("#budgetAmountInput"),
   budgetCancelBtn: document.querySelector("#budgetCancelBtn"),
@@ -841,6 +849,20 @@ function normalizeState() {
       const amount = Number(plan.income) || 0;
       plan.budgets = amount ? [{ id: crypto.randomUUID(), name: "Monthly Budget", amount }] : [];
     }
+    
+    // Normalize budget items to include reminder fields
+    plan.budgets = plan.budgets.map((b) => ({
+      id: b.id || crypto.randomUUID(),
+      name: String(b.name || "").trim(),
+      amount: Number(b.amount) || 0,
+      reminderEnabled: !!b.reminderEnabled,
+      reminderCategory: String(b.reminderCategory || ""),
+      reminderDueDate: String(b.reminderDueDate || ""),
+      reminderRecurring: String(b.reminderRecurring || "Every Month"),
+      reminderBefore: String(b.reminderBefore || "1 Day Before"),
+      paidMonths: b.paidMonths || {},
+      alarmMuted: !!b.alarmMuted
+    }));
   }
 }
 
@@ -1068,6 +1090,7 @@ function render() {
   renderCategoryDropdown();
   renderTransactions();
   renderGoals();
+  renderReminders();
   drawChart(categories);
   renderComparisonReport();
   renderEmiPlanner();
@@ -1297,6 +1320,17 @@ function startBudgetEdit(budgetId) {
   editingBudgetId = budgetId;
   els.budgetNameInput.value = budget.name;
   els.budgetAmountInput.value = budget.amount;
+
+  // Populate reminder inputs
+  const enabled = !!budget.reminderEnabled;
+  toggleReminderFields(enabled);
+  if (enabled) {
+    if (els.reminderCategory) els.reminderCategory.value = budget.reminderCategory || "";
+    if (els.reminderDueDate) els.reminderDueDate.value = budget.reminderDueDate || "";
+    if (els.reminderRecurring) els.reminderRecurring.value = budget.reminderRecurring || "Every Month";
+    if (els.reminderBefore) els.reminderBefore.value = budget.reminderBefore || "1 Day Before";
+  }
+
   els.budgetCancelBtn.hidden = false;
   els.budgetForm.querySelector("button[type=submit]").textContent = "Update Budget";
   els.budgetNameInput.focus();
@@ -1305,6 +1339,7 @@ function startBudgetEdit(budgetId) {
 function resetBudgetEdit() {
   editingBudgetId = null;
   els.budgetForm.reset();
+  toggleReminderFields(false);
   els.budgetCancelBtn.hidden = true;
   els.budgetForm.querySelector("button[type=submit]").textContent = "Add Budget";
 }
@@ -1416,6 +1451,188 @@ function renderBudgets() {
     if (els.budgetTable) els.budgetTable.appendChild(tr);
   }
 }
+
+function renderReminders() {
+  const plan = getPlan();
+  if (!plan || !plan.budgets) return;
+
+  const todayStr = today().slice(0, 10); // "YYYY-MM-DD"
+  const tYear = Number(todayStr.slice(0, 4));
+  const tMonth = Number(todayStr.slice(5, 7)) - 1;
+  const tDay = Number(todayStr.slice(8, 10));
+  const todayStart = new Date(tYear, tMonth, tDay);
+
+  const reminders = plan.budgets.filter(b => b.reminderEnabled);
+
+  let dueTodayCount = 0;
+  let dueTodayAmt = 0;
+
+  let dueTomorrowCount = 0;
+  let dueTomorrowAmt = 0;
+
+  let dueWeekCount = 0;
+  let dueWeekAmt = 0;
+
+  let overdueCount = 0;
+  let overdueAmt = 0;
+
+  let totalBillsCount = reminders.length;
+  let totalBillsAmt = 0;
+
+  let html = "";
+
+  reminders.forEach(b => {
+    const dueDateStr = b.reminderDueDate;
+    if (!dueDateStr) return;
+
+    const dYear = Number(dueDateStr.slice(0, 4));
+    const dMonth = Number(dueDateStr.slice(5, 7)) - 1;
+    const dDay = Number(dueDateStr.slice(8, 10));
+    const dueStart = new Date(dYear, dMonth, dDay);
+
+    const diffTime = dueStart.getTime() - todayStart.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+    const isPaid = b.paidMonths && b.paidMonths[state.selectedMonth];
+
+    let statusText = "Upcoming";
+    let statusClass = "upcoming";
+    let dueInText = "";
+
+    if (isPaid) {
+      statusText = "Paid";
+      statusClass = "paid";
+      dueInText = "Paid";
+    } else {
+      if (diffDays === 0) {
+        statusText = "Due Today";
+        statusClass = "due-today";
+        dueInText = "Today";
+        dueTodayCount++;
+        dueTodayAmt += b.amount;
+      } else if (diffDays === 1) {
+        statusText = "Due Tomorrow";
+        statusClass = "due-tomorrow";
+        dueInText = "Tomorrow";
+        dueTomorrowCount++;
+        dueTomorrowAmt += b.amount;
+      } else if (diffDays > 1) {
+        statusText = "Upcoming";
+        statusClass = "upcoming";
+        dueInText = `${diffDays} days`;
+        if (diffDays <= 7) {
+          dueWeekCount++;
+          dueWeekAmt += b.amount;
+        }
+      } else {
+        statusText = "Overdue";
+        statusClass = "overdue";
+        dueInText = "Overdue";
+        overdueCount++;
+        overdueAmt += b.amount;
+      }
+    }
+
+    if (!isPaid) {
+      totalBillsAmt += b.amount;
+    }
+
+    // Format display date: e.g. "05 Jul 2026"
+    const dateOptions = { day: '2-digit', month: 'short', year: 'numeric' };
+    const formattedDate = dueStart.toLocaleDateString('en-GB', dateOptions);
+
+    // Format relative subtext below date: e.g. "Tomorrow" or "In 3 days"
+    let subtextHtml = "";
+    if (isPaid) {
+      subtextHtml = `<div style="font-size: 11px; color: var(--muted); margin-top: 2px;">Paid for this month</div>`;
+    } else if (diffDays === 0) {
+      subtextHtml = `<div style="font-size: 11px; color: var(--green); font-weight: 600; margin-top: 2px;">Today</div>`;
+    } else if (diffDays === 1) {
+      subtextHtml = `<div style="font-size: 11px; color: #f2994a; font-weight: 600; margin-top: 2px;">Tomorrow</div>`;
+    } else if (diffDays > 1) {
+      subtextHtml = `<div style="font-size: 11px; color: var(--muted); margin-top: 2px;">In ${diffDays} days</div>`;
+    } else {
+      subtextHtml = `<div style="font-size: 11px; color: var(--red); font-weight: 600; margin-top: 2px;">Overdue by ${Math.abs(diffDays)} days</div>`;
+    }
+
+    // Alarm active check
+    const alarmClass = b.alarmMuted ? "" : "active";
+    const checkBgColor = isPaid ? "var(--green)" : "transparent";
+    const checkTextColor = isPaid ? "#ffffff" : "var(--muted)";
+    const checkBorderColor = isPaid ? "var(--green)" : "var(--line)";
+
+    html += `
+      <tr style="${isPaid ? 'opacity: 0.65;' : ''}">
+        <td>
+          <div style="display: flex; align-items: center; gap: 8px; font-weight: 600;">
+            <span style="font-size: 16px;">💳</span>
+            <span>${escapeHtml(b.name)}</span>
+          </div>
+        </td>
+        <td>
+          <span class="status-badge" style="background: rgba(47, 125, 87, 0.08); color: var(--green); border-radius: 4px; padding: 2px 6px;">
+            ${escapeHtml(b.reminderCategory || "Utilities")}
+          </span>
+        </td>
+        <td>
+          <div>
+            <strong>${formattedDate}</strong>
+            ${subtextHtml}
+          </div>
+        </td>
+        <td>
+          <span style="font-size: 12px; color: var(--muted);">${escapeHtml(b.reminderRecurring || "Every Month")}</span>
+        </td>
+        <td class="amount-cell" style="font-weight: 600;">
+          ${currency.format(b.amount)}
+        </td>
+        <td>
+          <span style="font-size: 12px; font-weight: 500;">${dueInText}</span>
+        </td>
+        <td>
+          <span class="status-badge ${statusClass}">${statusText}</span>
+        </td>
+        <td style="text-align: center; white-space: nowrap;">
+          <button class="action-btn-circle pay-btn" title="${isPaid ? 'Mark as Unpaid' : 'Mark as Paid'}" data-reminder-id="${b.id}" style="background: ${checkBgColor}; color: ${checkTextColor}; border-color: ${checkBorderColor};">
+            ✓
+          </button>
+          <button class="action-btn-circle notify-btn ${alarmClass}" title="Toggle Alarm" data-reminder-alarm-id="${b.id}">
+            🔔
+          </button>
+          <button class="action-btn-circle delete-btn" title="Turn Off Reminder" data-reminder-delete-id="${b.id}">
+            ✕
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+
+  if (els.upcomingRemindersTableBody) {
+    els.upcomingRemindersTableBody.innerHTML = html;
+  }
+
+  if (els.emptyRemindersMsg) {
+    els.emptyRemindersMsg.style.display = reminders.length === 0 ? "block" : "none";
+  }
+
+  // Update stats
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setVal("roDueTodayCount", dueTodayCount);
+  setVal("roDueTodayAmt", currency.format(dueTodayAmt));
+
+  setVal("roDueTomorrowCount", dueTomorrowCount);
+  setVal("roDueTomorrowAmt", currency.format(dueTomorrowAmt));
+
+  setVal("roDueWeekCount", dueWeekCount);
+  setVal("roDueWeekAmt", currency.format(dueWeekAmt));
+
+  setVal("roOverdueCount", overdueCount);
+  setVal("roOverdueAmt", currency.format(overdueAmt));
+
+  setVal("roTotalBillsCount", totalBillsCount);
+  setVal("roTotalBillsAmt", currency.format(totalBillsAmt));
+}
+
 
 /*async function renderCategoryDropdown() {
 
@@ -2293,6 +2510,33 @@ els.incomeTable.addEventListener("click", async (event) => {
   }
 });
 
+function toggleReminderFields(enabled) {
+  if (els.budgetReminderToggle) els.budgetReminderToggle.checked = enabled;
+  if (els.reminderFieldsContainer) {
+    if (enabled) {
+      els.reminderFieldsContainer.style.opacity = "1";
+      els.reminderFieldsContainer.style.pointerEvents = "auto";
+      if (els.reminderCategory) { els.reminderCategory.disabled = false; els.reminderCategory.required = true; }
+      if (els.reminderDueDate) { els.reminderDueDate.disabled = false; els.reminderDueDate.required = true; }
+      if (els.reminderRecurring) { els.reminderRecurring.disabled = false; els.reminderRecurring.required = true; }
+      if (els.reminderBefore) { els.reminderBefore.disabled = false; els.reminderBefore.required = true; }
+    } else {
+      els.reminderFieldsContainer.style.opacity = "0.5";
+      els.reminderFieldsContainer.style.pointerEvents = "none";
+      if (els.reminderCategory) { els.reminderCategory.disabled = true; els.reminderCategory.required = false; els.reminderCategory.value = ""; }
+      if (els.reminderDueDate) { els.reminderDueDate.disabled = true; els.reminderDueDate.required = false; els.reminderDueDate.value = ""; }
+      if (els.reminderRecurring) { els.reminderRecurring.disabled = true; els.reminderRecurring.required = false; els.reminderRecurring.value = "Every Month"; }
+      if (els.reminderBefore) { els.reminderBefore.disabled = true; els.reminderBefore.required = false; els.reminderBefore.value = "1 Day Before"; }
+    }
+  }
+}
+
+if (els.budgetReminderToggle) {
+  els.budgetReminderToggle.addEventListener("change", (e) => {
+    toggleReminderFields(e.target.checked);
+  });
+}
+
 els.budgetForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const plan = getPlan();
@@ -2303,13 +2547,36 @@ els.budgetForm.addEventListener("submit", async (event) => {
     return;
   }
 
+  const reminderEnabled = els.budgetReminderToggle ? els.budgetReminderToggle.checked : false;
+  const reminderCategory = reminderEnabled ? els.reminderCategory.value.trim() : "";
+  const reminderDueDate = reminderEnabled ? els.reminderDueDate.value : "";
+  const reminderRecurring = reminderEnabled ? els.reminderRecurring.value : "Every Month";
+  const reminderBefore = reminderEnabled ? els.reminderBefore.value : "1 Day Before";
+
+  const budgetData = {
+    name,
+    amount,
+    reminderEnabled,
+    reminderCategory,
+    reminderDueDate,
+    reminderRecurring,
+    reminderBefore
+  };
+
   if (editingBudgetId) {
     const existing = plan.budgets.find((item) => item.id == editingBudgetId);
     if (existing) {
       existing.name = name;
       existing.amount = amount;
+      existing.reminderEnabled = reminderEnabled;
+      existing.reminderCategory = reminderCategory;
+      existing.reminderDueDate = reminderDueDate;
+      existing.reminderRecurring = reminderRecurring;
+      existing.reminderBefore = reminderBefore;
+      existing.paidMonths = existing.paidMonths || {};
+      existing.alarmMuted = !!existing.alarmMuted;
     } else {
-      plan.budgets.push({ id: editingBudgetId, name, amount });
+      plan.budgets.push({ id: editingBudgetId, ...budgetData, paidMonths: {}, alarmMuted: false });
     }
     resetBudgetEdit();
   } else {
@@ -2317,13 +2584,21 @@ els.budgetForm.addEventListener("submit", async (event) => {
     if (existing) {
       existing.name = name;
       existing.amount = amount;
+      existing.reminderEnabled = reminderEnabled;
+      existing.reminderCategory = reminderCategory;
+      existing.reminderDueDate = reminderDueDate;
+      existing.reminderRecurring = reminderRecurring;
+      existing.reminderBefore = reminderBefore;
+      existing.paidMonths = existing.paidMonths || {};
+      existing.alarmMuted = !!existing.alarmMuted;
     } else {
-      plan.budgets.push({ id: crypto.randomUUID(), name, amount });
+      plan.budgets.push({ id: crypto.randomUUID(), ...budgetData, paidMonths: {}, alarmMuted: false });
     }
   }
 
   rememberValue("savedBudgetNames", name);
   els.budgetForm.reset();
+  toggleReminderFields(false);
   try {
     await saveState();
     render();
@@ -2473,6 +2748,82 @@ els.budgetTable.addEventListener("click", async (event) => {
     reportError(error);
   }
 });
+
+if (els.upcomingRemindersTableBody) {
+  els.upcomingRemindersTableBody.addEventListener("click", async (event) => {
+    const payBtn = event.target.closest(".pay-btn");
+    const notifyBtn = event.target.closest(".notify-btn");
+    const deleteBtn = event.target.closest(".delete-btn");
+
+    if (payBtn) {
+      const budgetId = payBtn.getAttribute("data-reminder-id");
+      const plan = getPlan();
+      const budget = plan.budgets.find(b => b.id == budgetId);
+      if (budget) {
+        budget.paidMonths = budget.paidMonths || {};
+        const isPaid = !budget.paidMonths[state.selectedMonth];
+        budget.paidMonths[state.selectedMonth] = isPaid;
+
+        if (isPaid) {
+          // Auto add transaction
+          state.transactions.push({
+            id: crypto.randomUUID(),
+            type: "expense",
+            category: budget.name,
+            amount: budget.amount,
+            date: today().slice(0, 10),
+            note: `Paid ${budget.name}`
+          });
+        } else {
+          // Remove transaction
+          state.transactions = state.transactions.filter(
+            t => !(t.type === "expense" && t.category === budget.name && t.amount === budget.amount && t.note === `Paid ${budget.name}`)
+          );
+        }
+
+        try {
+          await saveState();
+          render();
+        } catch (error) {
+          reportError(error);
+        }
+      }
+      return;
+    }
+
+    if (notifyBtn) {
+      const budgetId = notifyBtn.getAttribute("data-reminder-alarm-id");
+      const plan = getPlan();
+      const budget = plan.budgets.find(b => b.id == budgetId);
+      if (budget) {
+        budget.alarmMuted = !budget.alarmMuted;
+        try {
+          await saveState();
+          render();
+        } catch (error) {
+          reportError(error);
+        }
+      }
+      return;
+    }
+
+    if (deleteBtn) {
+      const budgetId = deleteBtn.getAttribute("data-reminder-delete-id");
+      const plan = getPlan();
+      const budget = plan.budgets.find(b => b.id == budgetId);
+      if (budget && confirm("Are you sure you want to turn off the reminder for this budget item?")) {
+        budget.reminderEnabled = false;
+        try {
+          await saveState();
+          render();
+        } catch (error) {
+          reportError(error);
+        }
+      }
+      return;
+    }
+  });
+}
 
 els.budgetCancelBtn.addEventListener("click", () => {
   resetBudgetEdit();
@@ -4307,6 +4658,284 @@ if (sipBodyContainer) {
 
 // Initialize Investment UI Selection Cards and Tabs
 initInvestmentTrackerUI();
+
+// ── NEW: Reminder Calendar Logic ──
+let calendarYear = new Date().getFullYear();
+let calendarMonth = new Date().getMonth();
+
+const calendarModal = document.querySelector("#calendarModal");
+const btnViewCalendar = document.querySelector("#btnViewCalendar");
+const btnCloseCalendarModal = document.querySelector("#btnCloseCalendarModal");
+const btnPrevMonth = document.querySelector("#btnPrevMonth");
+const btnNextMonth = document.querySelector("#btnNextMonth");
+const calendarCurrentMonthYear = document.querySelector("#calendarCurrentMonthYear");
+const calendarGridBody = document.querySelector("#calendarGridBody");
+const calendarDayDetails = document.querySelector("#calendarDayDetails");
+const calendarDetailsHeader = document.querySelector("#calendarDetailsHeader");
+const calendarDetailsList = document.querySelector("#calendarDetailsList");
+
+function renderCalendar() {
+  if (!calendarCurrentMonthYear || !calendarGridBody) return;
+
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  calendarCurrentMonthYear.textContent = `${monthNames[calendarMonth]} ${calendarYear}`;
+
+  const firstDayIndex = new Date(calendarYear, calendarMonth, 1).getDay();
+  const totalDays = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+
+  const targetMonthStr = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}`;
+  const plan = state.plans[targetMonthStr] || getPlan();
+  const activeReminders = (plan && plan.budgets) ? plan.budgets.filter(b => b.reminderEnabled) : [];
+
+  let html = "";
+
+  for (let i = 0; i < firstDayIndex; i++) {
+    html += `<div class="calendar-day empty"></div>`;
+  }
+
+  const todayStr = today().slice(0, 10);
+  const tYear = Number(todayStr.slice(0, 4));
+  const tMonth = Number(todayStr.slice(5, 7)) - 1;
+  const tDay = Number(todayStr.slice(8, 10));
+
+  for (let day = 1; day <= totalDays; day++) {
+    const isToday = (calendarYear === tYear && calendarMonth === tMonth && day === tDay);
+
+    const dayReminders = activeReminders.filter(b => {
+      if (!b.reminderDueDate) return false;
+      const rDay = parseInt(b.reminderDueDate.split('-')[2], 10);
+      const rMonth = parseInt(b.reminderDueDate.split('-')[1], 10) - 1;
+      const rYear = parseInt(b.reminderDueDate.split('-')[0], 10);
+
+      if (b.reminderRecurring === "Current Month only") {
+        return rYear === calendarYear && rMonth === calendarMonth && rDay === day;
+      } else {
+        const startDate = new Date(b.reminderDueDate);
+        const currentDate = new Date(calendarYear, calendarMonth, day);
+        if (currentDate < startDate) return false;
+
+        if (b.reminderRecurring === "Every Month") {
+          return rDay === day;
+        } else if (b.reminderRecurring === "Quarterly") {
+          const monthDiff = (calendarMonth - rMonth + 12) % 3;
+          return monthDiff === 0 && rDay === day;
+        } else if (b.reminderRecurring === "Half Yearly") {
+          const monthDiff = (calendarMonth - rMonth + 12) % 6;
+          return monthDiff === 0 && rDay === day;
+        } else if (b.reminderRecurring === "Yearly") {
+          return rMonth === calendarMonth && rDay === day;
+        }
+      }
+      return false;
+    });
+
+    const hasRem = dayReminders.length > 0;
+    let dayClass = "calendar-day";
+    if (isToday) dayClass += " today";
+
+    let dotsHtml = "";
+    if (hasRem) {
+      dayClass += " has-reminder";
+      
+      const anyOverdue = dayReminders.some(b => {
+        const isPaid = b.paidMonths && b.paidMonths[targetMonthStr];
+        if (isPaid) return false;
+        const dueStart = new Date(calendarYear, calendarMonth, day);
+        const todayStart = new Date(tYear, tMonth, tDay);
+        return dueStart < todayStart;
+      });
+
+      const allPaid = dayReminders.every(b => b.paidMonths && b.paidMonths[targetMonthStr]);
+
+      if (allPaid) {
+        dayClass += " paid";
+      } else if (anyOverdue) {
+        dayClass += " overdue";
+      }
+
+      dotsHtml = `<div class="day-marker-dots">`;
+      dayReminders.forEach(b => {
+        const isPaid = b.paidMonths && b.paidMonths[targetMonthStr];
+        const dueStart = new Date(calendarYear, calendarMonth, day);
+        const todayStart = new Date(tYear, tMonth, tDay);
+        const isOverdue = !isPaid && dueStart < todayStart;
+
+        let dotClass = "marker-dot";
+        if (isPaid) dotClass += " paid";
+        else if (isOverdue) dotClass += " overdue";
+
+        dotsHtml += `<span class="${dotClass}" title="${escapeHtml(b.name)}"></span>`;
+      });
+      dotsHtml += `</div>`;
+    }
+
+    html += `
+      <div class="${dayClass}" data-day="${day}">
+        <span>${day}</span>
+        ${dotsHtml}
+      </div>
+    `;
+  }
+
+  calendarGridBody.innerHTML = html;
+}
+
+function showDayDetails(day) {
+  if (!calendarDayDetails || !calendarDetailsHeader || !calendarDetailsList) return;
+
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  calendarDetailsHeader.textContent = `Due on ${monthNames[calendarMonth]} ${day}, ${calendarYear}`;
+
+  const targetMonthStr = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}`;
+  const plan = state.plans[targetMonthStr] || getPlan();
+  const activeReminders = (plan && plan.budgets) ? plan.budgets.filter(b => b.reminderEnabled) : [];
+
+  const dayReminders = activeReminders.filter(b => {
+    if (!b.reminderDueDate) return false;
+    const rDay = parseInt(b.reminderDueDate.split('-')[2], 10);
+    const rMonth = parseInt(b.reminderDueDate.split('-')[1], 10) - 1;
+    const rYear = parseInt(b.reminderDueDate.split('-')[0], 10);
+
+    if (b.reminderRecurring === "Current Month only") {
+      return rYear === calendarYear && rMonth === calendarMonth && rDay === day;
+    } else {
+      const startDate = new Date(b.reminderDueDate);
+      const currentDate = new Date(calendarYear, calendarMonth, day);
+      if (currentDate < startDate) return false;
+
+      if (b.reminderRecurring === "Every Month") {
+        return rDay === day;
+      } else if (b.reminderRecurring === "Quarterly") {
+        const monthDiff = (calendarMonth - rMonth + 12) % 3;
+        return monthDiff === 0 && rDay === day;
+      } else if (b.reminderRecurring === "Half Yearly") {
+        const monthDiff = (calendarMonth - rMonth + 12) % 6;
+        return monthDiff === 0 && rDay === day;
+      } else if (b.reminderRecurring === "Yearly") {
+        return rMonth === calendarMonth && rDay === day;
+      }
+    }
+    return false;
+  });
+
+  if (dayReminders.length === 0) {
+    calendarDayDetails.hidden = true;
+    return;
+  }
+
+  let html = "";
+  dayReminders.forEach(b => {
+    const isPaid = b.paidMonths && b.paidMonths[targetMonthStr];
+    let statusText = "Upcoming";
+    let statusColor = "var(--blue)";
+
+    const todayStr = today().slice(0, 10);
+    const todayStart = new Date(Number(todayStr.slice(0, 4)), Number(todayStr.slice(5, 7)) - 1, Number(todayStr.slice(8, 10)));
+    const dueStart = new Date(calendarYear, calendarMonth, day);
+
+    if (isPaid) {
+      statusText = "Paid";
+      statusColor = "var(--green)";
+    } else if (dueStart < todayStart) {
+      statusText = "Overdue";
+      statusColor = "var(--red)";
+    } else if (dueStart.getTime() === todayStart.getTime()) {
+      statusText = "Due Today";
+      statusColor = "var(--green)";
+    }
+
+    html += `
+      <li>
+        <div>
+          <span class="item-name">${escapeHtml(b.name)}</span>
+          <span class="item-meta">(${escapeHtml(b.reminderCategory || "Utilities")})</span>
+        </div>
+        <div style="text-align: right;">
+          <strong style="display: block;">${currency.format(b.amount)}</strong>
+          <span style="font-size: 10px; font-weight: 600; color: ${statusColor};">${statusText}</span>
+        </div>
+      </li>
+    `;
+  });
+
+  calendarDetailsList.innerHTML = html;
+  calendarDayDetails.hidden = false;
+}
+
+if (btnViewCalendar) {
+  btnViewCalendar.addEventListener("click", () => {
+    if (calendarModal) {
+      calendarModal.hidden = false;
+      if (state.selectedMonth) {
+        calendarYear = parseInt(state.selectedMonth.split('-')[0], 10);
+        calendarMonth = parseInt(state.selectedMonth.split('-')[1], 10) - 1;
+      } else {
+        const d = new Date();
+        calendarYear = d.getFullYear();
+        calendarMonth = d.getMonth();
+      }
+      if (calendarDayDetails) calendarDayDetails.hidden = true;
+      renderCalendar();
+    }
+  });
+}
+
+if (btnCloseCalendarModal) {
+  btnCloseCalendarModal.addEventListener("click", () => {
+    if (calendarModal) calendarModal.hidden = true;
+  });
+}
+
+if (calendarModal) {
+  calendarModal.addEventListener("click", (e) => {
+    if (e.target === calendarModal) {
+      calendarModal.hidden = true;
+    }
+  });
+}
+
+if (btnPrevMonth) {
+  btnPrevMonth.addEventListener("click", () => {
+    calendarMonth--;
+    if (calendarMonth < 0) {
+      calendarMonth = 11;
+      calendarYear--;
+    }
+    if (calendarDayDetails) calendarDayDetails.hidden = true;
+    renderCalendar();
+  });
+}
+
+if (btnNextMonth) {
+  btnNextMonth.addEventListener("click", () => {
+    calendarMonth++;
+    if (calendarMonth > 11) {
+      calendarMonth = 0;
+      calendarYear++;
+    }
+    if (calendarDayDetails) calendarDayDetails.hidden = true;
+    renderCalendar();
+  });
+}
+
+if (calendarGridBody) {
+  calendarGridBody.addEventListener("click", (e) => {
+    const dayCell = e.target.closest(".calendar-day");
+    if (!dayCell || dayCell.classList.contains("empty")) return;
+
+    const day = parseInt(dayCell.dataset.day, 10);
+    showDayDetails(day);
+  });
+}
+
 
 (async function init() {
   try {

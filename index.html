@@ -1,11 +1,13 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Budget Monitor</title>
   <link rel="stylesheet" href="styles.css?v=20260626-fixed-design-v5">
 </head>
+
 <body>
   <div id="authContainer" class="auth-container">
     <section id="loginScreen" class="auth-screen active">
@@ -75,9 +77,9 @@
         <label for="monthSelect">Month</label>
         <input id="monthSelect" type="month">
         <script>
-          (function(){
+          (function () {
             var now = new Date();
-            var m = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+            var m = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
             document.getElementById('monthSelect').value = m;
           })();
         </script>
@@ -85,12 +87,12 @@
 
 
       <nav class="view-tabs" aria-label="Views">
-        <button class="tab-button active" data-view="overview" type="button">Overview</button>
-        <button class="tab-button" data-view="transactions" type="button">Transactions</button>
-        <button class="tab-button" data-view="emiPlanner" type="button">EMI Planner</button>
-        <button class="tab-button" data-view="investmentTracker" type="button">Investment Tracker</button>
-        <button class="tab-button" data-view="reports" type="button">Reports</button>
-        <button class="tab-button" data-view="goals" type="button">Goals</button>
+        <button class="tab-button active" data-view="overview" type="button">🏠 Financial Hub</button>
+        <button class="tab-button" data-view="transactions" type="button">💳 Transactions</button>
+        <button class="tab-button" data-view="emiPlanner" type="button">🏦 EMI Planner</button>
+        <button class="tab-button" data-view="investmentTracker" type="button">📈 Investment Tracker</button>
+        <button class="tab-button" data-view="reports" type="button">📊 Reports</button>
+        <button class="tab-button" data-view="goals" type="button">🎯 Goals</button>
       </nav>
 
       <section class="quick-stats" aria-label="Quick stats">
@@ -112,7 +114,8 @@
           <h2 id="pageTitle">Overview</h2>
         </div>
         <div class="top-actions">
-          <button id="exportBtn" class="ghost-button" type="button" title="Export an Excel workbook">Export Excel</button>
+          <button id="exportBtn" class="ghost-button" type="button" title="Export an Excel workbook">Export
+            Excel</button>
           <label class="import-button" title="Import exported Excel budget data">
             Import Excel File
             <input id="importInput" type="file" accept=".xls,application/vnd.ms-excel">
@@ -153,6 +156,87 @@
         </div>
         <div id="overviewAlerts" class="alert-banner" aria-live="polite" hidden></div>
 
+        <!-- ── NEW: Reminder Overview Section ── -->
+        <div class="reminder-header-row">
+          <h3>Reminder Overview</h3>
+          <button id="btnViewCalendar" class="primary-button outline-btn compact-btn" type="button"
+            style="border: 1px solid var(--green); background: transparent; color: var(--green); display: flex; align-items: center; gap: 6px;">
+            📅 View Calendar
+          </button>
+        </div>
+
+        <div class="reminder-overview-grid">
+          <div class="reminder-overview-card due-today">
+            <span class="card-icon">📅</span>
+            <div>
+              <span class="card-lbl">Due Today</span>
+              <strong id="roDueTodayCount" class="card-count">0</strong>
+              <span id="roDueTodayAmt" class="card-sub">₹0.00</span>
+            </div>
+          </div>
+          <div class="reminder-overview-card due-tomorrow">
+            <span class="card-icon">🕒</span>
+            <div>
+              <span class="card-lbl">Due Tomorrow</span>
+              <strong id="roDueTomorrowCount" class="card-count">0</strong>
+              <span id="roDueTomorrowAmt" class="card-sub">₹0.00</span>
+            </div>
+          </div>
+          <div class="reminder-overview-card due-week">
+            <span class="card-icon">📅</span>
+            <div>
+              <span class="card-lbl">Due This Week</span>
+              <strong id="roDueWeekCount" class="card-count">0</strong>
+              <span id="roDueWeekAmt" class="card-sub">₹0.00</span>
+            </div>
+          </div>
+          <div class="reminder-overview-card overdue">
+            <span class="card-icon">⚠</span>
+            <div>
+              <span class="card-lbl">Overdue</span>
+              <strong id="roOverdueCount" class="card-count">0</strong>
+              <span id="roOverdueAmt" class="card-sub">₹0.00</span>
+            </div>
+          </div>
+          <div class="reminder-overview-card total-bills">
+            <span class="card-icon">💳</span>
+            <div>
+              <span class="card-lbl">Total Monthly Bills</span>
+              <strong id="roTotalBillsCount" class="card-count">0</strong>
+              <span id="roTotalBillsAmt" class="card-sub">₹0.00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── NEW: Upcoming Reminders Panel ── -->
+        <section class="panel upcoming-reminders-panel" style="margin-bottom: 14px;">
+          <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>Upcoming Reminders</h3>
+            <button id="btnViewAllReminders" class="text-button" type="button"
+              style="color: var(--green); font-weight: 600;">View All</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>BILL / BUDGET NAME</th>
+                  <th>CATEGORY</th>
+                  <th>DUE DATE</th>
+                  <th>REPEAT</th>
+                  <th class="amount-cell">AMOUNT</th>
+                  <th>DUE IN</th>
+                  <th>STATUS</th>
+                  <th style="text-align: center;">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody id="upcomingRemindersTableBody">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+          <p id="emptyRemindersMsg" class="empty-state">No upcoming reminders for this month.</p>
+        </section>
+
         <div class="overview-grid">
           <section class="panel chart-panel">
             <div class="panel-header">
@@ -164,14 +248,15 @@
 
           <section class="panel">
             <div class="panel-header">
-              <h3>Income & Budget</h3>
+              <h3>Income &amp; Budget</h3>
               <button id="resetSampleBtn" class="text-button" type="button">Load sample</button>
             </div>
             <form id="balanceForm" class="balance-form">
               <label>
                 Income description
                 <div class="budget-name-input-row">
-                  <input id="incomeDescriptionInput" type="text" autocomplete="off" placeholder="Monthly salary" required>
+                  <input id="incomeDescriptionInput" type="text" autocomplete="off" placeholder="Monthly salary"
+                    required>
                   <div id="incomeSuggestionList" class="budget-suggestion-list" hidden></div>
                 </div>
               </label>
@@ -194,6 +279,56 @@
                 Expected budget amount
                 <input id="budgetAmountInput" type="number" min="0" step="0.01" placeholder="0.00" required>
               </label>
+
+              <!-- Reminder toggle switch and fields inside budgetForm -->
+              <div class="reminder-toggle-row"
+                style="display: flex; align-items: center; justify-content: space-between; margin-top: 15px; margin-bottom: 12px;">
+                <span style="font-size: 13px; font-weight: 600; color: var(--ink);">Reminder Notification</span>
+                <label class="switch-control"
+                  style="position: relative; display: inline-block; width: 40px; height: 20px; margin: 0;">
+                  <input type="checkbox" id="budgetReminderToggle" style="opacity: 0; width: 0; height: 0;">
+                  <span class="switch-slider"
+                    style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .3s; border-radius: 20px;"></span>
+                </label>
+              </div>
+
+              <div id="reminderFieldsContainer" class="reminder-fields-container"
+                style="opacity: 0.5; pointer-events: none; transition: opacity 0.25s ease; display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                <label>
+                  <span>Category *</span>
+                  <input id="reminderCategory" type="text" list="reminderCategories" placeholder="Select or type..."
+                    disabled style="width: 100%;">
+                  <datalist id="reminderCategories">
+                    <option value="Insurance">
+                    <option value="Utilities">
+                    <option value="Housing">
+                    <option value="Finance">
+                  </datalist>
+                </label>
+                <label>
+                  <span>Due Date *</span>
+                  <input id="reminderDueDate" type="date" disabled style="width: 100%;">
+                </label>
+                <label>
+                  <span>Recurring Period *</span>
+                  <select id="reminderRecurring" disabled style="width: 100%;">
+                    <option value="Current Month only">Current Month only</option>
+                    <option value="Every Month" selected>Every Month</option>
+                    <option value="Quarterly">Quarterly</option>
+                    <option value="Half Yearly">Half Yearly</option>
+                    <option value="Yearly">Yearly</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Reminder Before *</span>
+                  <select id="reminderBefore" disabled style="width: 100%;">
+                    <option value="1 Day Before" selected>1 Day Before</option>
+                    <option value="3 Days Before">3 Days Before</option>
+                    <option value="7 days before">7 days before</option>
+                  </select>
+                </label>
+              </div>
+
               <button class="primary-button" type="submit">Add Budget</button>
               <button id="budgetCancelBtn" class="text-button" type="button" hidden>Cancel</button>
             </form>
@@ -317,7 +452,8 @@
             <div class="transaction-list-actions">
               <label class="category-list-filter">
                 <span>Category</span>
-                <input id="transactionCategoryFilter" type="search" placeholder="Enter category name" autocomplete="off">
+                <input id="transactionCategoryFilter" type="search" placeholder="Enter category name"
+                  autocomplete="off">
               </label>
               <button id="clearMonthBtn" class="danger-button" type="button">Clear month</button>
             </div>
@@ -370,13 +506,13 @@
       <section id="emiPlannerView" class="view" aria-label="EMI Planner">
         <div id="emiPlannerAlerts" class="alert-banner" aria-live="polite" style="margin-bottom: 24px;" hidden></div>
         <div class="emi-planner-layout">
-          
+
           <!-- 1. EMI Planner - Dashboard -->
           <section class="panel">
             <div class="panel-header">
               <h3>1. EMI Planner - Dashboard</h3>
             </div>
-            
+
             <div style="margin-bottom: 12px; font-weight: 700; color: var(--ink);">EMI Overview</div>
             <div class="emi-dashboard-grid">
               <div class="emi-overview-card">
@@ -396,25 +532,32 @@
                 <strong id="emiPaidTillNow">₹0</strong>
               </div>
             </div>
-            
+
             <div class="emi-upcoming-box" id="emiUpcomingBox">
               <div class="emi-upcoming-info">
-                <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--gold); display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+                <span
+                  style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--gold); display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
                   📅 Upcoming EMI
                 </span>
                 <h4 id="emiUpcomingName">No Upcoming EMI</h4>
-                <p><strong id="emiUpcomingAmount">₹0</strong> is due on <span id="emiUpcomingDate" style="color: var(--red); font-weight: 700;">-</span></p>
+                <p><strong id="emiUpcomingAmount">₹0</strong> is due on <span id="emiUpcomingDate"
+                    style="color: var(--red); font-weight: 700;">-</span></p>
               </div>
-              <button class="primary-button" id="emiUpcomingMarkPaidBtn" type="button" style="min-height: 36px; padding: 0 12px; background: var(--green);">Mark as Paid</button>
+              <button class="primary-button" id="emiUpcomingMarkPaidBtn" type="button"
+                style="min-height: 36px; padding: 0 12px; background: var(--green);">Mark as Paid</button>
             </div>
-            
+
             <div class="emi-summary-box">
-              <div class="donut-chart-container" style="position: relative; display: inline-block; width: 80px; height: 80px; flex-shrink: 0;">
+              <div class="donut-chart-container"
+                style="position: relative; display: inline-block; width: 80px; height: 80px; flex-shrink: 0;">
                 <svg width="80" height="80" viewBox="0 0 36 36">
                   <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="#e8eee9" stroke-width="4"></circle>
-                  <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="var(--green)" stroke-width="4" stroke-dasharray="33.33 66.67" stroke-dashoffset="25"></circle>
+                  <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="var(--green)" stroke-width="4"
+                    stroke-dasharray="33.33 66.67" stroke-dashoffset="25"></circle>
                 </svg>
-                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 13px; font-weight: 800; color: var(--ink);">33.3%</div>
+                <div
+                  style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 13px; font-weight: 800; color: var(--ink);">
+                  33.3%</div>
               </div>
               <div class="emi-summary-legend">
                 <div style="font-weight: 700; font-size: 13px; margin-bottom: 4px;">EMI Summary</div>
@@ -484,7 +627,8 @@
           <section class="panel" style="grid-column: span 2;">
             <div class="panel-header">
               <h3>3. EMI Planner List</h3>
-              <button class="primary-button" id="addEmiScrollBtn" type="button" style="min-height: 36px; padding: 0 12px;">+ Add New EMI</button>
+              <button class="primary-button" id="addEmiScrollBtn" type="button"
+                style="min-height: 36px; padding: 0 12px;">+ Add New EMI</button>
             </div>
             <div style="margin-bottom: 12px; font-weight: 700; color: var(--ink);">Active EMI Plans</div>
             <div class="table-wrap">
@@ -537,7 +681,8 @@
               <h3>5. Mark EMI as Paid</h3>
             </div>
             <div style="margin-bottom: 12px; font-weight: 700; color: var(--ink);">Confirm Payment</div>
-            <div style="display: flex; justify-content: space-between; background: #f8faf7; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--line); margin-bottom: 16px;">
+            <div
+              style="display: flex; justify-content: space-between; background: #f8faf7; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--line); margin-bottom: 16px;">
               <div>
                 <span style="font-size: 11px; color: var(--muted); display: block; font-weight: 700;">EMI NAME</span>
                 <strong id="emiConfirmName" style="font-size: 14px; color: var(--ink);">-</strong>
@@ -583,12 +728,14 @@
             <div class="panel-header">
               <h3>6. Auto Transaction Created</h3>
             </div>
-            
-            <div class="alert-message alert-message--warning" style="background: #e6f4ea; border-color: #a3cfb6; color: #137333; margin-bottom: 16px; display: flex; gap: 12px; align-items: center;">
+
+            <div class="alert-message alert-message--warning"
+              style="background: #e6f4ea; border-color: #a3cfb6; color: #137333; margin-bottom: 16px; display: flex; gap: 12px; align-items: center;">
               <span class="alert-icon" style="background: rgba(19, 115, 51, 0.1); color: #137333;">✓</span>
               <div>
                 <strong style="font-size: 14px;">EMI marked as paid successfully!</strong>
-                <p style="margin: 2px 0 0 0; font-size: 12px; color: #137333; opacity: 0.85;">A transaction has been created.</p>
+                <p style="margin: 2px 0 0 0; font-size: 12px; color: #137333; opacity: 0.85;">A transaction has been
+                  created.</p>
               </div>
             </div>
 
@@ -635,7 +782,9 @@
               <div class="progress-track" style="height: 16px;">
                 <div id="emiProgressBarFill" class="progress-fill" style="width: 0%; background: var(--green);"></div>
               </div>
-              <div id="emiProgressPercentText" style="text-align: right; font-size: 12px; font-weight: bold; color: var(--green); margin-top: 4px;">0%</div>
+              <div id="emiProgressPercentText"
+                style="text-align: right; font-size: 12px; font-weight: bold; color: var(--green); margin-top: 4px;">0%
+              </div>
             </div>
           </section>
 
@@ -658,7 +807,8 @@
                 <span>Expected Current Month EMI</span>
                 <strong id="emiImpactTotal" class="red">₹0</strong>
               </div>
-              <div class="emi-impact-row" style="background: #fafbfc; padding: 10px 8px; border-radius: 4px; border-top: 2px solid var(--green);">
+              <div class="emi-impact-row"
+                style="background: #fafbfc; padding: 10px 8px; border-radius: 4px; border-top: 2px solid var(--green);">
                 <span>Final Available Expected Balance</span>
                 <strong id="emiImpactBalance" class="green" style="font-size: 16px;">₹0</strong>
               </div>
@@ -714,7 +864,8 @@
             </div>
             <div class="investment-metric-card">
               <span class="metric-title">TOTAL PROFIT</span>
-              <strong id="invTotalProfit" style="color: var(--green);">₹0 <span class="profit-badge" id="invProfitBadge"></span></strong>
+              <strong id="invTotalProfit" style="color: var(--green);">₹0 <span class="profit-badge"
+                  id="invProfitBadge"></span></strong>
               <span class="metric-subtitle">Total Profit / Gain</span>
             </div>
             <div class="investment-metric-card">
@@ -757,7 +908,8 @@
             <!-- Portfolio Growth Chart -->
             <section class="panel growth-chart-panel">
               <div class="panel-header">
-                <div class="chart-title-row" style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+                <div class="chart-title-row"
+                  style="display:flex;justify-content:space-between;align-items:center;width:100%;">
                   <h3>Portfolio Growth (This Year)</h3>
                   <select id="invGrowthRange" class="small-select">
                     <option value="year">This Year</option>
@@ -845,7 +997,8 @@
               </div>
               <div class="form-tabs">
                 <button class="form-tab-btn active" id="btnTabBasic" type="button">Basic Details</button>
-                <button class="form-tab-btn" id="btnTabMaturity" type="button">Maturity &amp; Returns (Optional)</button>
+                <button class="form-tab-btn" id="btnTabMaturity" type="button">Maturity &amp; Returns
+                  (Optional)</button>
               </div>
 
               <form id="addInvestmentForm" class="balance-form">
@@ -989,7 +1142,8 @@
                 </div>
 
                 <div class="form-actions" style="margin-top:20px;">
-                  <button type="submit" class="primary-button" style="background:var(--green);white-space:nowrap;">Save Investment</button>
+                  <button type="submit" class="primary-button" style="background:var(--green);white-space:nowrap;">Save
+                    Investment</button>
                   <button type="button" id="btnResetForm" class="ghost-button">Reset</button>
                 </div>
               </form>
@@ -1001,7 +1155,8 @@
                 <h3 id="schedulePanelTitle">3. Monthly Payment Schedule Preview</h3>
               </div>
               <div class="schedule-intro-msg" id="scheduleIntroMsg">
-                <p>ℹ️ Select a Monthly Recurring Investment or fill the form details to view the payment schedule preview.</p>
+                <p>ℹ️ Select a Monthly Recurring Investment or fill the form details to view the payment schedule
+                  preview.</p>
               </div>
               <div class="schedule-table-container" id="scheduleTableContainer" style="display:none;">
                 <div class="table-wrap" style="max-height:250px;overflow-y:auto;">
@@ -1119,7 +1274,9 @@
                     <strong id="summaryInstallmentsCount">0 of 0</strong>
                   </div>
                 </div>
-                <button type="button" class="primary-button outline-btn" id="btnViewHistory" style="margin-top:15px;width:100%;border:1px solid var(--green);background:transparent;color:var(--green);cursor:pointer;">View Full Payment History</button>
+                <button type="button" class="primary-button outline-btn" id="btnViewHistory"
+                  style="margin-top:15px;width:100%;border:1px solid var(--green);background:transparent;color:var(--green);cursor:pointer;">View
+                  Full Payment History</button>
               </div>
             </section>
           </div>
@@ -1258,9 +1415,41 @@
           </div>
 
 
-    </section>
+      </section>
   </main>
-          <div class="investment-row-1">
+
+  <!-- ── NEW: Calendar Modal for Reminder Notification ── -->
+  <div id="calendarModal" class="modal-backdrop" hidden>
+    <div class="calendar-modal-content">
+      <div class="calendar-modal-header">
+        <h3 id="calendarModalTitle">Reminder Calendar</h3>
+        <button id="btnCloseCalendarModal" class="close-modal-btn" type="button">×</button>
+      </div>
+      <div class="calendar-controls">
+        <button id="btnPrevMonth" class="cal-ctrl-btn" type="button">◀</button>
+        <span id="calendarCurrentMonthYear" class="cal-month-year">July 2026</span>
+        <button id="btnNextMonth" class="cal-ctrl-btn" type="button">▶</button>
+      </div>
+      <div class="calendar-grid-header">
+        <div>Sun</div>
+        <div>Mon</div>
+        <div>Tue</div>
+        <div>Wed</div>
+        <div>Thu</div>
+        <div>Fri</div>
+        <div>Sat</div>
+      </div>
+      <div id="calendarGridBody" class="calendar-grid-body">
+        <!-- Dynamically generated days -->
+      </div>
+      <div id="calendarDayDetails" class="calendar-day-details" hidden>
+        <h4 id="calendarDetailsHeader">Due on July 5, 2026</h4>
+        <ul id="calendarDetailsList">
+          <!-- List of reminders for selected day -->
+        </ul>
+      </div>
+    </div>
+  </div>
 
   <template id="goalTemplate">
     <article class="goal-card">
@@ -1275,6 +1464,7 @@
     </article>
   </template>
 
-  <script src="app.js?v=20260701-monthly-investment-v1"></script>
+  <script src="app.js?v=20260702-reminder-calendar-v1"></script>
 </body>
+
 </html>

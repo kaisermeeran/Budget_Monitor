@@ -45,8 +45,8 @@ button {
   width: 100%;
   height: 100%;
   background: linear-gradient(135deg, rgba(47, 125, 87, 0.15), transparent 38%),
-              linear-gradient(315deg, rgba(36, 126, 131, 0.15), transparent 42%),
-              #f5f7f3;
+    linear-gradient(315deg, rgba(36, 126, 131, 0.15), transparent 42%),
+    #f5f7f3;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -77,6 +77,7 @@ button {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -300,18 +301,30 @@ select:focus {
 }
 
 .tab-button {
-  min-height: 44px;
+  min-height: 48px;
   color: #415047;
   text-align: left;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 7px;
-  padding: 0 12px;
+  border-radius: 8px;
+  padding: 0 16px;
+
+  /* New */
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab-button:hover {
+  background: #f3f7f5;
 }
 
 .tab-button.active {
   color: #fff;
   background: var(--ink);
+  font-weight: 700;
 }
 
 .quick-stats {
@@ -912,6 +925,7 @@ tr.budget-negative .remaining-cell {
 }
 
 @media (max-width: 640px) {
+
   .content,
   .sidebar {
     padding: 18px;
@@ -1167,7 +1181,7 @@ tr.budget-negative .remaining-cell {
     grid-template-columns: 1fr;
     gap: 16px;
   }
-  
+
   .emi-planner-layout .panel[style*="grid-column: span 2"] {
     grid-column: auto !important;
   }
@@ -1521,6 +1535,7 @@ tr.budget-negative .remaining-cell {
 
 /* Responsive Overrides */
 @media (max-width: 1200px) {
+
   .investment-row-1,
   .investment-row-2,
   .investment-row-3,
@@ -1534,9 +1549,11 @@ tr.budget-negative .remaining-cell {
   .investment-metrics-grid {
     grid-template-columns: repeat(3, 1fr);
   }
+
   .dashboard-charts-grid {
     grid-template-columns: 1fr;
   }
+
   .summary-cards-grid {
     grid-template-columns: 1fr;
   }
@@ -1546,14 +1563,17 @@ tr.budget-negative .remaining-cell {
 .table-wrap::-webkit-scrollbar {
   height: 6px;
 }
+
 .table-wrap::-webkit-scrollbar-track {
   background: #f1f1f1;
   border-radius: 4px;
 }
+
 .table-wrap::-webkit-scrollbar-thumb {
   background: #c1c1c1;
   border-radius: 4px;
 }
+
 .table-wrap::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
@@ -1611,7 +1631,8 @@ tr.budget-negative .remaining-cell {
   color: var(--teal);
 }
 
-.primary-button, .ghost-button {
+.primary-button,
+.ghost-button {
   white-space: nowrap;
 }
 
@@ -1982,10 +2003,12 @@ tr.budget-negative .remaining-cell {
     grid-template-columns: 1fr;
     gap: 20px;
   }
+
   .investment-list-grid {
     grid-template-columns: 1fr;
     gap: 20px;
   }
+
   .investment-metrics-row {
     grid-template-columns: repeat(3, 1fr);
   }
@@ -2059,6 +2082,7 @@ tr.budget-negative .remaining-cell {
     grid-template-columns: 1fr;
     gap: 20px;
   }
+
   .growth-mini-metrics {
     grid-template-columns: repeat(3, 1fr);
   }
@@ -2070,4 +2094,465 @@ tr.budget-negative .remaining-cell {
   }
 }
 
+/* Reminder Notification Feature Styles */
+.reminder-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+  margin-bottom: 12px;
+}
 
+.reminder-header-row h3 {
+  font-size: 15px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.reminder-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.reminder-overview-card {
+  padding: 14px 16px;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.01);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.reminder-overview-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.04);
+}
+
+.reminder-overview-card .card-icon {
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+/* Color Coding for Overview Cards */
+.reminder-overview-card.due-today {
+  border-left: 4px solid var(--green);
+}
+
+.reminder-overview-card.due-today .card-icon {
+  background: #e6f4ea;
+  color: #137333;
+}
+
+.reminder-overview-card.due-tomorrow {
+  border-left: 4px solid #f2994a;
+}
+
+.reminder-overview-card.due-tomorrow .card-icon {
+  background: #fef7e0;
+  color: #b06000;
+}
+
+.reminder-overview-card.due-week {
+  border-left: 4px solid var(--blue);
+}
+
+.reminder-overview-card.due-week .card-icon {
+  background: #e8f0fe;
+  color: #1a73e8;
+}
+
+.reminder-overview-card.overdue {
+  border-left: 4px solid var(--red);
+}
+
+.reminder-overview-card.overdue .card-icon {
+  background: #fce8e6;
+  color: #c5221f;
+}
+
+.reminder-overview-card.total-bills {
+  border-left: 4px solid #9b51e0;
+}
+
+.reminder-overview-card.total-bills .card-icon {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.reminder-overview-card div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.reminder-overview-card .card-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.reminder-overview-card .card-count {
+  font-size: 18px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.reminder-overview-card .card-sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Custom Toggle Switch Slider */
+.switch-control input:checked+.switch-slider {
+  background-color: var(--green) !important;
+}
+
+.switch-control input:checked+.switch-slider:before {
+  transform: translateX(20px);
+}
+
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+
+/* Status Badges */
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 20px;
+  text-align: center;
+}
+
+.status-badge.due-today {
+  background: #e6f4ea;
+  color: #137333;
+}
+
+.status-badge.due-tomorrow {
+  background: #fef7e0;
+  color: #b06000;
+}
+
+.status-badge.upcoming {
+  background: #e8f0fe;
+  color: #1a73e8;
+}
+
+.status-badge.overdue {
+  background: #fce8e6;
+  color: #c5221f;
+}
+
+.status-badge.paid {
+  background: #f1f3f4;
+  color: #5f6368;
+  text-decoration: line-through;
+}
+
+/* Action buttons styling */
+.action-btn-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: var(--muted);
+  transition: all 0.2s;
+  margin: 0 3px;
+}
+
+.action-btn-circle:hover {
+  background: var(--bg-page, #f4f6f3);
+  color: var(--ink);
+  transform: scale(1.05);
+}
+
+.action-btn-circle.pay-btn:hover {
+  background: #e6f4ea;
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.action-btn-circle.notify-btn.active {
+  background: #e8f0fe;
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+@media (max-width: 1200px) {
+  .reminder-overview-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .reminder-overview-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Calendar Modal Backdrop */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  transition: opacity 0.25s ease;
+}
+
+.modal-backdrop[hidden] {
+  display: none !important;
+}
+
+/* Calendar Modal Content */
+.calendar-modal-content {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  width: 90%;
+  max-width: 500px;
+  padding: 20px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  animation: modalSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalSlideIn {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.calendar-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.calendar-modal-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+
+.close-modal-btn {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s;
+  padding: 0;
+  line-height: 1;
+}
+
+.close-modal-btn:hover {
+  color: var(--ink);
+}
+
+/* Controls */
+.calendar-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.cal-ctrl-btn {
+  background: transparent;
+  border: 1px solid var(--line);
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.cal-ctrl-btn:hover {
+  background: var(--bg-page, #f4f6f3);
+}
+
+.cal-month-year {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Grid */
+.calendar-grid-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.calendar-grid-body {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s;
+  background: var(--bg-page, #f4f6f3);
+}
+
+.calendar-day:hover {
+  background: var(--line);
+}
+
+.calendar-day.empty {
+  background: transparent;
+  cursor: default;
+  pointer-events: none;
+}
+
+.calendar-day.today {
+  border-color: var(--green);
+  font-weight: 700;
+  color: var(--green);
+  background: rgba(47, 125, 87, 0.05);
+}
+
+.calendar-day.has-reminder {
+  font-weight: 600;
+  background: #e8f0fe;
+  color: #1a73e8;
+}
+
+.calendar-day.has-reminder.overdue {
+  background: #fce8e6;
+  color: #c5221f;
+}
+
+.calendar-day.has-reminder.paid {
+  background: #e6f4ea;
+  color: #137333;
+}
+
+.day-marker-dots {
+  display: flex;
+  gap: 2px;
+  position: absolute;
+  bottom: 4px;
+}
+
+.marker-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #1a73e8;
+}
+
+.marker-dot.overdue {
+  background: #c5221f;
+}
+
+.marker-dot.paid {
+  background: #137333;
+}
+
+/* Day details panel in modal */
+.calendar-day-details {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.calendar-day-details h4 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.calendar-day-details ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.calendar-day-details li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  padding: 6px 8px;
+  background: var(--bg-page, #f4f6f3);
+  border-radius: 6px;
+}
+
+.calendar-day-details li .item-name {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.calendar-day-details li .item-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
