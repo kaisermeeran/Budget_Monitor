@@ -6,6 +6,7 @@ import os
 import sys
 import traceback
 import hashlib
+import urllib.request
 import secrets
 import time
 import threading
@@ -716,6 +717,152 @@ def write_state(user_id, data):
                 conn.commit()
 
 
+def safe_float(val, default=0.0):
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def prepare_financial_context(state_data, message):
+    if not isinstance(state_data, dict):
+        return "No financial context available."
+        
+    lower_msg = message.lower()
+    context = []
+    
+    username = state_data.get("username", "User")
+    selected_month = state_data.get("selectedMonth", "2026-07")
+    context.append(f"User Profile Name: {username}")
+    context.append(f"Current Selected Month: {selected_month}")
+    
+    wants_emi = any(w in lower_msg for w in ["emi", "loan", "debt", "payment", "installment"])
+    wants_invest = any(w in lower_msg for w in ["invest", "sip", "portfolio", "profit", "gain", "mutual", "stock", "wealth"])
+    wants_budget = any(w in lower_msg for w in ["budget", "spend", "expense", "income", "save", "saving", "cash flow", "limit", "transaction"])
+    
+    is_general = not (wants_emi or wants_invest or wants_budget)
+    
+    plans = state_data.get("plans", {})
+    current_plan = plans.get(selected_month, {}) if isinstance(plans, dict) else {}
+    if not isinstance(current_plan, dict):
+        current_plan = {}
+        
+    incomes = current_plan.get("incomes", [])
+    budgets = current_plan.get("budgets", [])
+    transactions = state_data.get("transactions", [])
+    
+    if wants_budget or is_general:
+        context.append("\n--- BUDGET & INCOME PROFILE ---")
+        total_income = sum(safe_float(i.get("amount", 0)) for i in incomes if isinstance(i, dict))
+        context.append(f"Total Income: Rs {total_income:.2f}")
+        for i in incomes:
+            if isinstance(i, dict):
+                context.append(f"- Income Source: {i.get('description')} = Rs {safe_float(i.get('amount', 0)):.2f}")
+            
+        total_budget = sum(safe_float(b.get("amount", 0)) for b in budgets if isinstance(b, dict))
+        context.append(f"Planned Expected Budget Total: Rs {total_budget:.2f}")
+        for b in budgets:
+            if isinstance(b, dict):
+                rem_str = " (Reminder Enabled)" if b.get("reminderEnabled") else ""
+                context.append(f"- Budget item: {b.get('name')} = Rs {safe_float(b.get('amount', 0)):.2f}{rem_str}")
+            
+        current_txs = [t for t in transactions if isinstance(t, dict) and t.get("date", "").startswith(selected_month)]
+        total_spent = sum(safe_float(t.get("amount", 0)) for t in current_txs if t.get("type") == "expense")
+        context.append(f"Actual Expenses Logged this month: Rs {total_spent:.2f}")
+        for t in current_txs:
+            context.append(f"- Transaction: {t.get('date')} | {t.get('type','').upper()} | {t.get('category','')} | {t.get('note','')} = Rs {safe_float(t.get('amount', 0)):.2f}")
+
+    if wants_emi or is_general:
+        context.append("\n--- DEBT & EMI PROFILE ---")
+        emis = state_data.get("emis", [])
+        if not isinstance(emis, list):
+            emis = []
+        context.append(f"Number of Active EMIs: {len(emis)}")
+        for e in emis:
+            if isinstance(e, dict):
+                paid_months = e.get("paidMonths", {})
+                paid_count = len(paid_months) if isinstance(paid_months, dict) else 0
+                total_months = int(safe_float(e.get("totalMonths", 12)))
+                context.append(f"- EMI Loan: {e.get('name')} | Monthly payment: Rs {safe_float(e.get('emiAmount', 0)):.2f} | Total duration: {total_months} months | Progress: {paid_count} months paid.")
+            
+    if wants_invest or is_general:
+        context.append("\n--- WEALTH & INVESTMENT PROFILE ---")
+        investments = state_data.get("investments", [])
+        if not isinstance(investments, list):
+            investments = []
+        total_invested = sum(safe_float(i.get("investedAmount", 0)) for i in investments if isinstance(i, dict))
+        total_value = sum(safe_float(i.get("currentValue", 0)) for i in investments if isinstance(i, dict))
+        profit = total_value - total_invested
+        context.append(f"Total Invested: Rs {total_invested:.2f}")
+        context.append(f"Current Value: Rs {total_value:.2f}")
+        context.append(f"Net Profit/Gain: Rs {profit:.2f}")
+        for i in investments:
+            if isinstance(i, dict):
+                context.append(f"- Investment: {i.get('name')} ({i.get('type')}) | Invested: Rs {safe_float(i.get('investedAmount', 0)):.2f} | Current Value: Rs {safe_float(i.get('currentValue', 0)):.2f}")
+            
+    goals = state_data.get("goals", [])
+    if not isinstance(goals, list):
+        goals = []
+    if goals:
+        context.append("\n--- GOALS ---")
+        for g in goals:
+            if isinstance(g, dict):
+                target = safe_float(g.get("targetAmount", 0))
+                saved = safe_float(g.get("savedAmount", 0))
+                context.append(f"- Goal: {g.get('name')} | Target: Rs {target:.2f} | Saved: Rs {saved:.2f}")
+
+    return "\n".join(context)
+
+
+def ask_gemini_agent(api_key, context_text, user_question):
+    prompt = f"""You are an AI Financial Advisor Agent helping a user manage their personal budget, expenses, loans/EMIs, investments, and financial goals.
+You are given the user's live financial context extracted from the database below:
+
+[USER DATABASE CONTEXT]
+{context_text}
+[END CONTEXT]
+
+Analyze this context and answer the user's question directly.
+Provide realistic, helpful, and highly personalized financial suggestions.
+Keep your response concise, friendly, and structured.
+
+CRITICAL: Return the response in clean, beautiful, native HTML formatting (e.g. using <p>, <strong>, <ul>, <li>, <table>, <tr>, <td>, and styled inline spans). Do not include any markdown syntax or markdown block quotes like ```html. Output raw HTML tags directly.
+
+User's Question: "{user_question}"
+"""
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    req_body = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
+    }
+    
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(req_body).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+    
+    with urllib.request.urlopen(req, timeout=20) as response:
+        resp_body = response.read().decode("utf-8")
+        resp_data = json.loads(resp_body)
+        
+        candidates = resp_data.get("candidates", [])
+        if candidates:
+            parts = candidates[0].get("content", {}).get("parts", [])
+            if parts:
+                return parts[0].get("text", "No response generated.")
+        return "Could not generate advice response."
+
+
 class BudgetHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(APP_DIR), **kwargs)
@@ -963,6 +1110,56 @@ class BudgetHandler(SimpleHTTPRequestHandler):
                     return
                 write_state(user["id"], payload.get("state"))
                 self.send_json({"ok": True})
+                return
+            if path == "/api/ai/agent":
+                user = self.current_user()
+                if not user:
+                    self.send_json({"error": "Not authenticated"}, status=401)
+                    return
+                
+                message = payload.get("message", "").strip()
+                if not message:
+                    self.send_json({"error": "Message is required"}, status=400)
+                    return
+                
+                state_data = read_state(user["id"])
+                if not state_data:
+                    self.send_json({"error": "No app state found"}, status=404)
+                    return
+                
+                api_key = os.getenv("GEMINI_API_KEY")
+                if not api_key:
+                    # Fallback check inside .env and .env.example files manually
+                    for filename in [".env", ".env.example"]:
+                        env_path = APP_DIR / filename
+                        if env_path.exists():
+                            for line in env_path.read_text(encoding="utf-8").splitlines():
+                                if line.strip().startswith("GEMINI_API_KEY="):
+                                    api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                                    break
+                            if api_key:
+                                break
+                                
+                if not api_key:
+                    self.send_json({
+                        "ok": False,
+                        "error": "api_key_missing",
+                        "message": "Please configure GEMINI_API_KEY in your .env file to enable the database-driven AI Financial Advisor Agent."
+                    })
+                    return
+                
+                context_text = prepare_financial_context(state_data, message)
+                
+                try:
+                    ai_reply = ask_gemini_agent(api_key, context_text, message)
+                    self.send_json({"ok": True, "reply": ai_reply})
+                except Exception as e:
+                    traceback.print_exc()
+                    self.send_json({
+                        "ok": False,
+                        "error": "api_failed",
+                        "message": f"Gemini API request failed: {str(e)}"
+                    })
                 return
             if path == "/api/auth/register":
                 name = payload.get("name", "").strip()

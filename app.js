@@ -56,6 +56,19 @@ const els = {
   incomeInput: document.querySelector("#incomeInput"),
   incomeTable: document.querySelector("#incomeTable"),
   emptyIncome: document.querySelector("#emptyIncome"),
+  btnNotificationBell: document.querySelector("#btnNotificationBell"),
+  notificationBadge: document.querySelector("#notificationBadge"),
+  notificationDropdown: document.querySelector("#notificationDropdown"),
+  notificationList: document.querySelector("#notificationList"),
+  btnMarkAllRead: document.querySelector("#btnMarkAllRead"),
+  emptyNotifications: document.querySelector("#emptyNotifications"),
+  aiAdvisorFab: document.querySelector("#aiAdvisorFab"),
+  aiAdvisorDrawer: document.querySelector("#aiAdvisorDrawer"),
+  aiChatMessages: document.querySelector("#aiChatMessages"),
+  aiChatSuggestions: document.querySelector("#aiChatSuggestions"),
+  aiAdvisorForm: document.querySelector("#aiAdvisorForm"),
+  aiAdvisorInput: document.querySelector("#aiAdvisorInput"),
+  btnCloseAiAdvisor: document.querySelector("#btnCloseAiAdvisor"),
   budgetForm: document.querySelector("#budgetForm"),
   budgetNameInput: document.querySelector("#budgetNameInput"),
   budgetReminderToggle: document.querySelector("#budgetReminderToggle"),
@@ -357,6 +370,7 @@ async function loadAppState() {
   render();
   renderCategoryDropdown();
   initPushNotifications();
+  resetAiChatHistory();
 }
 
 function updateUserDisplay() {
@@ -452,6 +466,18 @@ function resetAuthForms() {
   clearAuthFormErrors();
 }
 
+function resetAiChatHistory() {
+  const username = currentUser ? (currentUser.name || "User") : "User";
+  aiChatHistory = [
+    {
+      sender: "ai",
+      text: `👋 Hi ${username}! I'm your AI Financial Advisor. How can I help you today?`,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+  ];
+  renderChatMessages();
+}
+
 async function logoutUser() {
   try {
     await apiFetch('/api/auth/logout', { method: 'POST' });
@@ -463,6 +489,7 @@ async function logoutUser() {
   resetAuthForms();
   hideAppShell();
   showAuthScreen('login');
+  resetAiChatHistory();
 }
 
 function today() {
@@ -794,6 +821,7 @@ function normalizeState() {
   state.investments ||= [];
   state.compareBaseMonth ||= "";
   state.compareTargetMonth ||= "";
+  state.readNotificationIds ||= [];
   
   state.investments = state.investments.map((item) => ({
     id: item.id || crypto.randomUUID(),
@@ -877,6 +905,22 @@ function uniqueSorted(values) {
     .sort((a, b) => a.localeCompare(b));
 }
 
+function getPreviousMonthPlan(monthStr) {
+  if (!state.plans) return null;
+  const months = Object.keys(state.plans).sort();
+  const idx = months.indexOf(monthStr);
+  if (idx > 0) {
+    return state.plans[months[idx - 1]];
+  }
+  let bestMonth = "";
+  for (const m of months) {
+    if (m < monthStr && m > bestMonth) {
+      bestMonth = m;
+    }
+  }
+  return bestMonth ? state.plans[bestMonth] : null;
+}
+
 function getPlanForMonth(monthStr) {
   if (!state) {
     state = getInitialState();
@@ -893,13 +937,86 @@ function getPlanForMonth(monthStr) {
       budgets: []
     };
     const plan = state.plans[monthStr];
-    if (Array.isArray(state.categories) && state.categories.length > 0) {
+    const prevPlan = getPreviousMonthPlan(monthStr);
+
+    if (prevPlan) {
+      plan.income = prevPlan.income || 0;
+      plan.incomes = (prevPlan.incomes || []).map(inc => ({
+        id: crypto.randomUUID(),
+        description: inc.description,
+        amount: inc.amount
+      }));
+      plan.budgets = (prevPlan.budgets || []).map(b => {
+        let reminderEnabled = !!b.reminderEnabled;
+        let reminderDueDate = b.reminderDueDate || "";
+
+        if (reminderEnabled) {
+          const rDay = reminderDueDate ? reminderDueDate.slice(8, 10) : "01";
+          const rYear = reminderDueDate ? reminderDueDate.slice(0, 4) : monthStr.slice(0, 4);
+          const rMonthStr = reminderDueDate ? reminderDueDate.slice(5, 7) : monthStr.slice(5, 7);
+
+          if (b.reminderRecurring === "Current Month only") {
+            reminderEnabled = false;
+            reminderDueDate = "";
+          } else if (b.reminderRecurring === "Every Month") {
+            reminderDueDate = `${monthStr}-${rDay}`;
+          } else if (b.reminderRecurring === "Quarterly") {
+            const prevMonthVal = parseInt(rMonthStr, 10);
+            const currMonthVal = parseInt(monthStr.slice(5, 7), 10);
+            const monthDiff = (currMonthVal - prevMonthVal + 12) % 3;
+            if (monthDiff === 0) {
+              reminderDueDate = `${monthStr}-${rDay}`;
+            } else {
+              reminderEnabled = false;
+              reminderDueDate = "";
+            }
+          } else if (b.reminderRecurring === "Half Yearly") {
+            const prevMonthVal = parseInt(rMonthStr, 10);
+            const currMonthVal = parseInt(monthStr.slice(5, 7), 10);
+            const monthDiff = (currMonthVal - prevMonthVal + 12) % 6;
+            if (monthDiff === 0) {
+              reminderDueDate = `${monthStr}-${rDay}`;
+            } else {
+              reminderEnabled = false;
+              reminderDueDate = "";
+            }
+          } else if (b.reminderRecurring === "Yearly") {
+            if (rMonthStr === monthStr.slice(5, 7)) {
+              reminderDueDate = `${monthStr}-${rDay}`;
+            } else {
+              reminderEnabled = false;
+              reminderDueDate = "";
+            }
+          }
+        }
+
+        return {
+          id: b.id,
+          name: b.name,
+          amount: b.amount,
+          reminderEnabled,
+          reminderCategory: b.reminderCategory || "",
+          reminderDueDate,
+          reminderRecurring: b.reminderRecurring || "Every Month",
+          reminderBefore: b.reminderBefore || "1 Day Before",
+          paidMonths: {},
+          alarmMuted: !!b.alarmMuted
+        };
+      });
+    } else if (Array.isArray(state.categories) && state.categories.length > 0) {
       plan.budgets = state.categories
         .filter(c => c.type === "expense")
         .map(c => ({
           id: c.id,
           name: c.name,
-          amount: Number(c.amount) || 0
+          amount: Number(c.amount) || 0,
+          reminderEnabled: false,
+          reminderCategory: "",
+          reminderDueDate: "",
+          reminderRecurring: "Every Month",
+          reminderBefore: "1 Day Before",
+          paidMonths: {},
+          alarmMuted: false
         }));
       plan.incomes = state.categories
         .filter(c => c.type === "income")
@@ -1091,6 +1208,7 @@ function render() {
   renderTransactions();
   renderGoals();
   renderReminders();
+  renderNotifications();
   drawChart(categories);
   renderComparisonReport();
   renderEmiPlanner();
@@ -1631,6 +1749,89 @@ function renderReminders() {
 
   setVal("roTotalBillsCount", totalBillsCount);
   setVal("roTotalBillsAmt", currency.format(totalBillsAmt));
+}
+
+function renderNotifications() {
+  const plan = getPlan();
+  if (!plan || !plan.budgets) return;
+
+  const todayStr = today().slice(0, 10);
+  const tYear = Number(todayStr.slice(0, 4));
+  const tMonth = Number(todayStr.slice(5, 7)) - 1;
+  const tDay = Number(todayStr.slice(8, 10));
+  const todayStart = new Date(tYear, tMonth, tDay);
+
+  const activeReminders = plan.budgets.filter(b => b.reminderEnabled);
+  const notifications = [];
+
+  activeReminders.forEach(b => {
+    const dueDateStr = b.reminderDueDate;
+    if (!dueDateStr) return;
+
+    let daysBefore = 1;
+    if (b.reminderBefore.includes("3")) daysBefore = 3;
+    else if (b.reminderBefore.includes("7")) daysBefore = 7;
+
+    const dYear = Number(dueDateStr.slice(0, 4));
+    const dMonth = Number(dueDateStr.slice(5, 7)) - 1;
+    const dDay = Number(dueDateStr.slice(8, 10));
+    const dueStart = new Date(dYear, dMonth, dDay);
+
+    const notificationStart = new Date(dYear, dMonth, dDay - daysBefore);
+
+    const isPaid = b.paidMonths && b.paidMonths[state.selectedMonth];
+
+    if (todayStart >= notificationStart && !isPaid) {
+      const id = `${b.id}_${state.selectedMonth}`;
+      const isRead = state.readNotificationIds.includes(id);
+
+      const dateOptions = { day: '2-digit', month: 'short', year: 'numeric' };
+      const formattedDate = dueStart.toLocaleDateString('en-GB', dateOptions);
+
+      notifications.push({
+        id,
+        budgetId: b.id,
+        title: b.name,
+        category: b.reminderCategory || "Utilities",
+        amount: b.amount,
+        dueDateStr,
+        formattedDate,
+        message: `${b.name} (${b.reminderCategory || 'Utilities'}) is due on ${formattedDate}.`,
+        read: isRead
+      });
+    }
+  });
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  if (els.notificationBadge) {
+    els.notificationBadge.textContent = unreadCount;
+    els.notificationBadge.hidden = unreadCount === 0;
+  }
+
+  if (els.notificationList) {
+    let html = "";
+    notifications.forEach(n => {
+      html += `
+        <li class="notification-item ${n.read ? '' : 'unread'}" data-notification-id="${n.id}">
+          <div class="item-title-row">
+            <span class="item-title">${escapeHtml(n.title)}</span>
+            <span class="item-amount">${currency.format(n.amount)}</span>
+          </div>
+          <p class="item-message">${escapeHtml(n.message)}</p>
+          <div class="item-footer">
+            <span class="item-date">Due: ${n.formattedDate}</span>
+            <button class="item-pay-btn" type="button" data-budget-id="${n.budgetId}">Mark Paid</button>
+          </div>
+        </li>
+      `;
+    });
+    els.notificationList.innerHTML = html;
+  }
+
+  if (els.emptyNotifications) {
+    els.emptyNotifications.style.display = notifications.length === 0 ? "block" : "none";
+  }
 }
 
 
@@ -2821,6 +3022,123 @@ if (els.upcomingRemindersTableBody) {
         }
       }
       return;
+    }
+  });
+}
+
+if (els.btnNotificationBell) {
+  els.btnNotificationBell.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (els.notificationDropdown) {
+      els.notificationDropdown.hidden = !els.notificationDropdown.hidden;
+    }
+  });
+}
+
+document.addEventListener("click", (e) => {
+  if (els.notificationDropdown && !e.target.closest(".notification-bell-container")) {
+    els.notificationDropdown.hidden = true;
+  }
+});
+
+if (els.btnMarkAllRead) {
+  els.btnMarkAllRead.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const plan = getPlan();
+    if (!plan || !plan.budgets) return;
+
+    const todayStr = today().slice(0, 10);
+    const tYear = Number(todayStr.slice(0, 4));
+    const tMonth = Number(todayStr.slice(5, 7)) - 1;
+    const tDay = Number(todayStr.slice(8, 10));
+    const todayStart = new Date(tYear, tMonth, tDay);
+
+    const activeReminders = plan.budgets.filter(b => b.reminderEnabled);
+    let updated = false;
+
+    activeReminders.forEach(b => {
+      const dueDateStr = b.reminderDueDate;
+      if (!dueDateStr) return;
+
+      let daysBefore = 1;
+      if (b.reminderBefore.includes("3")) daysBefore = 3;
+      else if (b.reminderBefore.includes("7")) daysBefore = 7;
+
+      const dueStart = new Date(Number(dueDateStr.slice(0, 4)), Number(dueDateStr.slice(5, 7)) - 1, Number(dueDateStr.slice(8, 10)));
+      const notificationStart = new Date(dueStart.getFullYear(), dueStart.getMonth(), dueStart.getDate() - daysBefore);
+      const isPaid = b.paidMonths && b.paidMonths[state.selectedMonth];
+
+      if (todayStart >= notificationStart && !isPaid) {
+        const id = `${b.id}_${state.selectedMonth}`;
+        if (!state.readNotificationIds.includes(id)) {
+          state.readNotificationIds.push(id);
+          updated = true;
+        }
+      }
+    });
+
+    if (updated) {
+      try {
+        await saveState();
+        render();
+      } catch (error) {
+        reportError(error);
+      }
+    }
+  });
+}
+
+if (els.notificationList) {
+  els.notificationList.addEventListener("click", async (e) => {
+    const payBtn = e.target.closest(".item-pay-btn");
+    const item = e.target.closest(".notification-item");
+
+    if (payBtn) {
+      e.stopPropagation();
+      const budgetId = payBtn.getAttribute("data-budget-id");
+      const plan = getPlan();
+      const budget = plan.budgets.find(b => b.id == budgetId);
+      if (budget) {
+        budget.paidMonths = budget.paidMonths || {};
+        budget.paidMonths[state.selectedMonth] = true;
+
+        // Auto add transaction
+        state.transactions.push({
+          id: crypto.randomUUID(),
+          type: "expense",
+          category: budget.name,
+          amount: budget.amount,
+          date: today().slice(0, 10),
+          note: `Paid ${budget.name}`
+        });
+
+        // Mark corresponding notification read
+        const nid = `${budget.id}_${state.selectedMonth}`;
+        if (!state.readNotificationIds.includes(nid)) {
+          state.readNotificationIds.push(nid);
+        }
+
+        try {
+          await saveState();
+          render();
+        } catch (error) {
+          reportError(error);
+        }
+      }
+      return;
+    }
+
+    if (item) {
+      const nid = item.getAttribute("data-notification-id");
+      if (nid && !state.readNotificationIds.includes(nid)) {
+        state.readNotificationIds.push(nid);
+        try {
+          await saveState();
+          render();
+        } catch (error) {
+          reportError(error);
+        }
+      }
     }
   });
 }
@@ -4933,6 +5251,565 @@ if (calendarGridBody) {
 
     const day = parseInt(dayCell.dataset.day, 10);
     showDayDetails(day);
+  });
+}
+
+// ── NEW: AI Financial Advisor ChatBot Logic ──
+let aiChatHistory = [
+  {
+    sender: "ai",
+    text: "👋 Hi Kaiser! I'm your AI Financial Advisor. How can I help you today?",
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
+];
+
+function getAdvisorStats() {
+  const plan = getPlan();
+  const rows = monthlyTransactions();
+  
+  const budgetTotal = plan.budgets.reduce((sum, item) => sum + item.amount, 0);
+  const income = plan.incomes.reduce((sum, item) => sum + item.amount, 0);
+
+  const emis = state.emis || [];
+  const currentMonthEmiAmount = emis
+    .filter(e => isEmiScheduledForMonth(e, state.selectedMonth))
+    .reduce((sum, e) => sum + e.emiAmount, 0);
+
+  const currentMonthPaidEmiAmount = emis
+    .filter(e => e.paidMonths && e.paidMonths[state.selectedMonth])
+    .reduce((sum, e) => sum + e.emiAmount, 0);
+
+  const nonEmiExpenses = rows
+    .filter((row) => row.type === "expense" && (!row.category || !row.category.startsWith("EMI - ")))
+    .reduce((sum, row) => sum + row.amount, 0);
+
+  const totalExpenses = nonEmiExpenses + currentMonthPaidEmiAmount;
+  const emiDue = Math.max(0, currentMonthEmiAmount - currentMonthPaidEmiAmount);
+
+  const upcomingBills = plan.budgets
+    .filter(b => b.reminderEnabled && !(b.paidMonths && b.paidMonths[state.selectedMonth]))
+    .reduce((sum, b) => sum + b.amount, 0);
+
+  const availableAmount = income - (totalExpenses + emiDue + upcomingBills);
+
+  return {
+    income,
+    totalExpenses,
+    emiDue,
+    upcomingBills,
+    availableAmount
+  };
+}
+
+function getTopSpendingCategory() {
+  const rows = monthlyTransactions().filter(r => r.type === "expense" && (!r.category || !r.category.startsWith("EMI - ")));
+  const counts = {};
+  rows.forEach(r => {
+    const cat = r.category || "Uncategorized";
+    counts[cat] = (counts[cat] || 0) + r.amount;
+  });
+
+  let topCat = null;
+  for (const cat in counts) {
+    if (!topCat || counts[cat] > topCat.amount) {
+      topCat = { name: cat, amount: counts[cat] };
+    }
+  }
+  return topCat;
+}
+
+function getSpendingCategoryBreakdown() {
+  const rows = monthlyTransactions().filter(r => r.type === "expense" && (!r.category || !r.category.startsWith("EMI - ")));
+  const counts = {};
+  rows.forEach(r => {
+    const cat = r.category || "Uncategorized";
+    counts[cat] = (counts[cat] || 0) + r.amount;
+  });
+
+  return Object.keys(counts)
+    .map(name => ({ name, amount: counts[name] }))
+    .sort((a, b) => b.amount - a.amount);
+}
+
+function addMessage(sender, text, htmlContent = "") {
+  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const msgObj = { sender, text, htmlContent, time };
+  aiChatHistory.push(msgObj);
+  renderChatMessages();
+}
+
+function renderChatMessages() {
+  const container = els.aiChatMessages;
+  if (!container) return;
+
+  let html = "";
+  aiChatHistory.forEach((msg) => {
+    if (msg.sender === "user") {
+      html += `
+        <div class="chat-msg user">
+          ${escapeHtml(msg.text)}
+          <span class="msg-meta">${msg.time} ✔✔</span>
+        </div>
+      `;
+    } else {
+      html += `
+        <div class="chat-msg ai">
+          ${msg.text ? `<div>${escapeHtml(msg.text)}</div>` : ''}
+          ${msg.htmlContent || ''}
+          <span class="msg-meta">${msg.time}</span>
+        </div>
+      `;
+    }
+  });
+
+  container.innerHTML = html;
+  container.scrollTop = container.scrollHeight;
+}
+
+function showTypingIndicator() {
+  const container = els.aiChatMessages;
+  if (!container) return null;
+
+  const indicator = document.createElement("div");
+  indicator.className = "chat-msg ai typing-msg";
+  indicator.innerHTML = `
+    <div class="typing-indicator">
+      <span class="typing-dot"></span>
+      <span class="typing-dot"></span>
+      <span class="typing-dot"></span>
+    </div>
+  `;
+  container.appendChild(indicator);
+  container.scrollTop = container.scrollHeight;
+  return indicator;
+}
+
+function getLocalAdvisorReply(text) {
+  const stats = getAdvisorStats();
+  const lowerText = text.toLowerCase();
+
+  let replyText = "";
+  let htmlContent = "";
+
+  if (lowerText.includes("financial health") || lowerText.includes("health checkup") || lowerText.includes("health report") || lowerText.includes("analyze my finances") || lowerText.includes("analyze finances") || lowerText.includes("financial analysis")) {
+    const plan = getPlan();
+    const rows = monthlyTransactions();
+    const income = plan.incomes.reduce((sum, item) => sum + item.amount, 0);
+
+    // 1. Savings & Cash Flow
+    const currentMonthEmiAmount = (state.emis || [])
+      .filter(e => isEmiScheduledForMonth(e, state.selectedMonth))
+      .reduce((sum, e) => sum + e.emiAmount, 0);
+    const currentMonthPaidEmiAmount = (state.emis || [])
+      .filter(e => e.paidMonths && e.paidMonths[state.selectedMonth])
+      .reduce((sum, e) => sum + e.emiAmount, 0);
+    const nonEmiExpenses = rows
+      .filter((row) => row.type === "expense" && (!row.category || !row.category.startsWith("EMI - ")))
+      .reduce((sum, row) => sum + row.amount, 0);
+    const totalExpenses = nonEmiExpenses + currentMonthPaidEmiAmount;
+    const netSavings = income - totalExpenses;
+    const savingsRate = income > 0 ? Math.round((netSavings / income) * 100) : 0;
+
+    let savingsRating = "Healthy";
+    let savingsColor = "var(--green)";
+    let savingsBg = "rgba(47, 125, 87, 0.1)";
+    let savingsAdvice = "Great saving habits! Keep maintaining a robust savings rate.";
+
+    if (savingsRate <= 0) {
+      savingsRating = "Critical";
+      savingsColor = "var(--red)";
+      savingsBg = "#fce8e6";
+      savingsAdvice = "Warning: Your monthly expenses exceed or equal your income. Look to restrict non-essential expenses immediately.";
+    } else if (savingsRate < 20) {
+      savingsRating = "Warning";
+      savingsColor = "#b06000";
+      savingsBg = "#fef7e0";
+      savingsAdvice = "You should aim to save at least 20% of your income. Look at setting budget limits to cut discretionary spending.";
+    }
+
+    // 2. Debt & EMI Ratio
+    const emiCommitment = currentMonthEmiAmount;
+    const emiRatio = income > 0 ? Math.round((emiCommitment / income) * 100) : 0;
+
+    let emiRating = "Healthy";
+    let emiColor = "var(--green)";
+    let emiBg = "rgba(47, 125, 87, 0.1)";
+    let emiAdvice = "Your monthly debt commitments are well within standard limits (< 30%).";
+
+    if (emiCommitment === 0) {
+      emiRating = "Excellent";
+      emiAdvice = "Fantastic! You are currently completely free from debt commitments.";
+    } else if (emiRatio >= 45) {
+      emiRating = "High Risk";
+      emiColor = "var(--red)";
+      emiBg = "#fce8e6";
+      emiAdvice = "Critical: Over 45% of your income goes to EMIs. Consider restructuring loans or avoiding new debt commitments.";
+    } else if (emiRatio >= 30) {
+      emiRating = "Warning";
+      emiColor = "#b06000";
+      emiBg = "#fef7e0";
+      emiAdvice = "Attention: Debt-to-income is high (30-45%). Keep monitoring this before making new purchases.";
+    }
+
+    // 3. Wealth & Investments
+    const totalInvested = (state.investments || []).reduce((sum, item) => sum + item.investedAmount, 0);
+    const portfolioValue = (state.investments || []).reduce((sum, item) => sum + item.currentValue, 0);
+    const netProfit = portfolioValue - totalInvested;
+    const roiPct = totalInvested > 0 ? Math.round((netProfit / totalInvested) * 100) : 0;
+    const roiSign = netProfit >= 0 ? "+" : "";
+    const roiColor = netProfit >= 0 ? "var(--green)" : "var(--red)";
+
+    let investAdvice = "Praise: You are regularly investing and building long-term wealth.";
+    if (totalInvested === 0) {
+      investAdvice = "Advice: You have no active investments. Consider setting up a monthly SIP to beat inflation.";
+    } else if (roiPct < 0) {
+      investAdvice = "Advice: Your portfolio is currently showing a net loss. Ensure your asset distribution is diversified.";
+    }
+
+    // 4. Goal Progression
+    const goalsCount = (state.goals || []).length;
+    let avgGoalPct = 0;
+    let emergencyFundGoal = false;
+
+    if (goalsCount > 0) {
+      const sumPct = (state.goals || []).reduce((sum, g) => {
+        const target = Number(g.targetAmount) || 0;
+        const current = Number(g.savedAmount) || 0;
+        const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+        return sum + pct;
+      }, 0);
+      avgGoalPct = Math.round(sumPct / goalsCount);
+
+      emergencyFundGoal = (state.goals || []).some(g => {
+        const name = (g.name || "").toLowerCase();
+        return name.includes("emergency") || name.includes("reserve") || name.includes("savings fund");
+      });
+    }
+
+    let goalsAdvice = "Good progress towards active targets. Try automating savings to reach them faster.";
+    if (goalsCount === 0) {
+      goalsAdvice = "Advice: No active financial goals found. Set up an Emergency Fund goal representing 3-6 months of expenses.";
+    } else if (!emergencyFundGoal) {
+      goalsAdvice = "Recommendation: Create a specific 'Emergency Fund' goal to cover unexpected costs before investing heavily.";
+    }
+
+    replyText = `Here is your complete AI Financial Health analysis based on your current live dashboard profile:`;
+    htmlContent = `
+      <div class="advisor-recommendation-card" style="width: 100%; border-color: var(--green); margin-top: 6px;">
+        <div class="advisor-rec-header" style="color: var(--green);">
+          <span class="rec-icon" style="background: rgba(47, 125, 87, 0.1); color: var(--green);">📊</span>
+          <span>AI Financial Health Checkup</span>
+        </div>
+        
+        <div style="font-size: 11px; display: flex; flex-direction: column; gap: 10px; margin-top: 10px; width: 100%;">
+          <!-- 1. Cash Flow Section -->
+          <div style="border-bottom: 1px solid #f1f3f0; padding-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin-bottom: 4px;">
+              <span style="color: var(--ink);">1. Savings & Cash Flow</span>
+              <span style="color: ${savingsColor}; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: ${savingsBg};">${savingsRating}</span>
+            </div>
+            <div style="color: var(--muted); line-height: 1.4;">
+              Savings Rate: <strong>${savingsRate}%</strong> (${currency.format(netSavings)} saved this month).
+              <p style="margin: 2px 0 0 0; font-size: 10px; color: var(--ink);">${savingsAdvice}</p>
+            </div>
+          </div>
+
+          <!-- 2. Debt & EMI Section -->
+          <div style="border-bottom: 1px solid #f1f3f0; padding-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin-bottom: 4px;">
+              <span style="color: var(--ink);">2. Debt & EMI Ratio</span>
+              <span style="color: ${emiColor}; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: ${emiBg};">${emiRating}</span>
+            </div>
+            <div style="color: var(--muted); line-height: 1.4;">
+              Monthly EMI Commitment: <strong>${currency.format(emiCommitment)}</strong> (${emiRatio}% of monthly income).
+              <p style="margin: 2px 0 0 0; font-size: 10px; color: var(--ink);">${emiAdvice}</p>
+            </div>
+          </div>
+
+          <!-- 3. Wealth & Investments Section -->
+          <div style="border-bottom: 1px solid #f1f3f0; padding-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin-bottom: 4px;">
+              <span style="color: var(--ink);">3. Wealth & Investments</span>
+              <span style="color: var(--green); font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: rgba(47, 125, 87, 0.1);">Active</span>
+            </div>
+            <div style="color: var(--muted); line-height: 1.4;">
+              Total Portfolio Invested: <strong>${currency.format(totalInvested)}</strong> (Value: ${currency.format(portfolioValue)}).<br>
+              Net Profit/Gain: <strong style="color: ${roiColor};">${currency.format(netProfit)} (${roiSign}${roiPct}%)</strong>.
+              <p style="margin: 2px 0 0 0; font-size: 10px; color: var(--ink);">${investAdvice}</p>
+            </div>
+          </div>
+
+          <!-- 4. Goal Progression Section -->
+          <div style="padding-bottom: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin-bottom: 4px;">
+              <span style="color: var(--ink);">4. Goal Tracking</span>
+              <span style="color: var(--blue); font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #e8f0fe;">Goals: ${goalsCount}</span>
+            </div>
+            <div style="color: var(--muted); line-height: 1.4;">
+              Average Goals Progress: <strong>${avgGoalPct}%</strong>.
+              <p style="margin: 2px 0 0 0; font-size: 10px; color: var(--ink);">${goalsAdvice}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  else if (lowerText.includes("how can i save more") || lowerText.includes("save more")) {
+    const topCat = getTopSpendingCategory();
+    replyText = `To save more this month, you should analyze your largest spending areas.`;
+    if (topCat) {
+      replyText += ` Currently, your highest spending category is "${topCat.name}" at ${currency.format(topCat.amount)}. Try reducing your budget limit for this category.`;
+    } else {
+      replyText += ` Currently, you don't have any logged transactions. Setting up strict budget limits for categories like Dining, Entertainment, and Shopping is a great first step.`;
+    }
+    replyText += ` Also, ensure that all recurring monthly bills are reviewed to eliminate any unused subscriptions.`;
+  } 
+  else if (lowerText.includes("analyze my spending") || lowerText.includes("analyze spending") || lowerText.includes("spending")) {
+    const spentSummary = getSpendingCategoryBreakdown();
+    replyText = `Here is your spending analysis for the current month:`;
+    if (spentSummary.length > 0) {
+      htmlContent = `
+        <div style="margin-top: 8px; font-size: 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 10px; width: 100%;">
+          <strong style="display: block; margin-bottom: 6px; color: var(--ink);">Expenses by Category</strong>
+          ${spentSummary.map(c => `
+            <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f1f3f0;">
+              <span>${escapeHtml(c.name)}</span>
+              <strong>${currency.format(c.amount)}</strong>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    } else {
+      replyText += ` You haven't logged any expense transactions for ${state.selectedMonth} yet. Add transactions to see a category-wise breakdown!`;
+    }
+  }
+  else if (lowerText.includes("show upcoming bills") || lowerText.includes("upcoming bills") || lowerText.includes("bills")) {
+    const plan = getPlan();
+    const unpaidReminders = plan && plan.budgets ? plan.budgets.filter(b => b.reminderEnabled && !(b.paidMonths && b.paidMonths[state.selectedMonth])) : [];
+    
+    if (unpaidReminders.length > 0) {
+      replyText = `You have ${unpaidReminders.length} unpaid bill(s) remaining for this month:`;
+      htmlContent = `
+        <div style="margin-top: 8px; font-size: 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 10px; display: flex; flex-direction: column; gap: 6px; width: 100%;">
+          ${unpaidReminders.map(b => `
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f3f0; padding-bottom: 4px;">
+              <div>
+                <strong style="color: var(--ink); display: block;">${escapeHtml(b.name)}</strong>
+                <span style="font-size: 10px; color: var(--muted);">Due: ${b.reminderDueDate || '-'}</span>
+              </div>
+              <strong style="color: var(--red);">${currency.format(b.amount)}</strong>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    } else {
+      replyText = `Great news! You have no unpaid bills or active reminders for this month.`;
+    }
+  }
+  else if (
+    lowerText.includes("buy") || 
+    lowerText.includes("purchase") || 
+    lowerText.includes("purchased") || 
+    lowerText.includes("afford") || 
+    lowerText.includes("iphone") || 
+    lowerText.includes("watch") || 
+    lowerText.includes("phone") || 
+    lowerText.includes("laptop") || 
+    lowerText.includes("macbook") || 
+    lowerText.includes("car") || 
+    lowerText.includes("ipad") ||
+    lowerText.includes("coffee") ||
+    lowerText.includes("bike") ||
+    lowerText.includes("tv") ||
+    lowerText.includes("camera")
+  ) {
+    let item = "purchase";
+    let price = 10000;
+
+    if (lowerText.includes("iphone")) {
+      item = "iPhone";
+      price = 80000;
+    } else if (lowerText.includes("macbook")) {
+      item = "MacBook";
+      price = 120000;
+    } else if (lowerText.includes("laptop")) {
+      item = "Laptop";
+      price = 50000;
+    } else if (lowerText.includes("watch")) {
+      item = "basic model Watch";
+      price = 5000;
+      if (lowerText.includes("apple") || lowerText.includes("smart")) {
+        item = "Smart Watch";
+        price = 25000;
+      }
+    } else if (lowerText.includes("car")) {
+      item = "Car";
+      price = 800000;
+    } else if (lowerText.includes("coffee")) {
+      item = "Coffee";
+      price = 250;
+    } else if (lowerText.includes("ipad")) {
+      item = "iPad";
+      price = 45000;
+    } else if (lowerText.includes("bike")) {
+      item = "Bike";
+      price = 150000;
+    } else if (lowerText.includes("tv") || lowerText.includes("television")) {
+      item = "TV";
+      price = 35000;
+    } else if (lowerText.includes("camera")) {
+      item = "Camera";
+      price = 55000;
+    }
+
+    replyText = `Let me analyze your finances for this month.`;
+    
+    const affordable = stats.availableAmount >= price;
+    
+    const summaryCardHtml = `
+      <div class="advisor-summary-card">
+        <h4>Your Financial Summary</h4>
+        <div class="advisor-summary-row">
+          <span>Monthly Income</span>
+          <strong>${currency.format(stats.income)}</strong>
+        </div>
+        <div class="advisor-summary-row">
+          <span>Total Expenses</span>
+          <strong>${currency.format(stats.totalExpenses)}</strong>
+        </div>
+        <div class="advisor-summary-row">
+          <span>EMI Due</span>
+          <strong>${currency.format(stats.emiDue)}</strong>
+        </div>
+        <div class="advisor-summary-row">
+          <span>Upcoming Bills</span>
+          <strong>${currency.format(stats.upcomingBills)}</strong>
+        </div>
+        <div class="advisor-summary-row available-amt">
+          <span>Available Amount</span>
+          <strong>${currency.format(stats.availableAmount)}</strong>
+        </div>
+      </div>
+    `;
+
+    const recCardHtml = `
+      <div class="advisor-recommendation-card">
+        <div class="advisor-rec-header">
+          <span class="rec-icon" style="background: ${affordable ? '#e6f4ea' : '#fce8e6'}; color: ${affordable ? '#137333' : '#c5221f'};">${affordable ? '✓' : '!'}</span>
+          <span>Recommendation</span>
+        </div>
+        <p class="advisor-rec-text">
+          ${affordable 
+            ? `It is safe to buy an ${item} this month! You have enough available funds after factoring in all your monthly EMIs and bills.`
+            : `It's not ideal to buy an ${item} this month. Your available amount is only ${currency.format(stats.availableAmount)}, and you have important bills and EMIs upcoming. Consider waiting or saving more for a better purchase.`
+          }
+        </p>
+        <div class="advisor-rec-actions">
+          <h5>💡 Suggested Action</h5>
+          <ul>
+            ${affordable
+              ? `<li>Proceed with the purchase if it is necessary.</li>
+                 <li>Keep an eye on any unexpected miscellaneous expenses.</li>`
+              : `<li>Save at least ${currency.format(price - stats.availableAmount)} more</li>
+                 <li>Reduce Entertainment spending</li>
+                 <li>You can consider buying next month</li>`
+            }
+          </ul>
+        </div>
+      </div>
+    `;
+
+    htmlContent = summaryCardHtml + recCardHtml;
+  }
+  else if (lowerText.includes("hi") || lowerText.includes("hello") || lowerText.includes("hey")) {
+    replyText = `Hello! I am your AI Financial Advisor. Ask me anything about your monthly budget, bills, EMIs, or investment commitments. You can also click the quick action chips below!`;
+  }
+  else {
+    replyText = `Your current available amount for ${state.selectedMonth} is ${currency.format(stats.availableAmount)} (Income: ${currency.format(stats.income)}, Expenses: ${currency.format(stats.totalExpenses)}, EMIs: ${currency.format(stats.emiDue)}, Unpaid Bills: ${currency.format(stats.upcomingBills)}). Let me know if you would like me to analyze your spending or list your upcoming bills!`;
+  }
+
+  return { replyText, htmlContent };
+}
+
+async function handleUserMessage(text) {
+  addMessage("user", text);
+
+  const indicator = showTypingIndicator();
+
+  try {
+    const res = await fetch("/api/ai/agent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text })
+    });
+    
+    if (indicator) indicator.remove();
+
+    if (res.status === 401) {
+      addMessage("ai", "You are not authenticated. Please log in first.");
+      return;
+    }
+
+    const data = await res.json();
+    if (data.ok) {
+      addMessage("ai", "", data.reply);
+    } else {
+      if (data.error === "api_key_missing") {
+        addMessage("ai", `⚠️ Gemini API Key Missing.\n${data.message}`);
+      } else {
+        addMessage("ai", `⚠️ AI Agent connection failed: ${data.message || "Unknown error"}`);
+      }
+      
+      const local = getLocalAdvisorReply(text);
+      addMessage("ai", `(Offline Demo mode): Here is my immediate database analysis:`, local.htmlContent);
+    }
+  } catch (error) {
+    console.error(error);
+    if (indicator) indicator.remove();
+    addMessage("ai", "⚠️ Connection to server AI Agent failed. Running local database analysis instead...");
+    const local = getLocalAdvisorReply(text);
+    addMessage("ai", `(Offline Demo mode): Here is my immediate database analysis:`, local.htmlContent);
+  }
+}
+
+if (els.aiAdvisorFab) {
+  els.aiAdvisorFab.addEventListener("click", () => {
+    if (els.aiAdvisorDrawer) {
+      els.aiAdvisorDrawer.hidden = false;
+      if (aiChatHistory.length === 1 && aiChatHistory[0].sender === "ai") {
+        aiChatHistory[0].text = `👋 Hi ${state?.username || "Kaiser"}! I'm your AI Financial Advisor. How can I help you today?`;
+      }
+      renderChatMessages();
+    }
+  });
+}
+
+if (els.btnCloseAiAdvisor) {
+  els.btnCloseAiAdvisor.addEventListener("click", () => {
+    if (els.aiAdvisorDrawer) {
+      els.aiAdvisorDrawer.hidden = true;
+    }
+  });
+}
+
+if (els.aiAdvisorForm) {
+  els.aiAdvisorForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (!els.aiAdvisorInput) return;
+    const text = els.aiAdvisorInput.value.trim();
+    if (!text) return;
+    els.aiAdvisorInput.value = "";
+    handleUserMessage(text);
+  });
+}
+
+if (els.aiChatSuggestions) {
+  els.aiChatSuggestions.addEventListener("click", (e) => {
+    const chip = e.target.closest(".suggestion-chip");
+    if (chip) {
+      const text = chip.textContent.trim();
+      handleUserMessage(text);
+    }
   });
 }
 

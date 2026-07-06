@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Budget Monitor</title>
-  <link rel="stylesheet" href="styles.css?v=20260702-reminder-v2">
+  <link rel="stylesheet" href="styles.css?v=20260703-security-v1">
 </head>
 
 <body>
@@ -120,9 +120,30 @@
             Import Excel File
             <input id="importInput" type="file" accept=".xls,application/vnd.ms-excel">
           </label>
-          <div class="user-section">
-            <span id="userDisplay" class="user-name"></span>
-            <button id="logoutBtn" class="ghost-button" type="button">Logout</button>
+          <div class="header-right-controls" style="display: flex; align-items: center; gap: 18px; position: relative;">
+            <!-- Notification Bell Dropdown -->
+            <div class="notification-bell-container" style="position: relative;">
+              <button id="btnNotificationBell" class="bell-button" type="button" aria-label="Notifications" style="background: transparent; border: none; font-size: 20px; cursor: pointer; position: relative; padding: 4px; display: flex; align-items: center;">
+                🔔<span id="notificationBadge" class="bell-badge" hidden style="position: absolute; top: -4px; right: -4px; background: var(--red, #eb5757); color: white; font-size: 10px; font-weight: 700; border-radius: 10px; padding: 1px 5px; min-width: 14px; text-align: center; border: 2px solid var(--bg-card, #ffffff);">0</span>
+              </button>
+              <div id="notificationDropdown" class="notification-dropdown" hidden style="position: absolute; top: 100%; right: 0; background: var(--bg-card, #ffffff); border: 1px solid var(--line); border-radius: 8px; width: 320px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1); z-index: 1000; margin-top: 8px; max-height: 400px; overflow-y: auto;">
+                <div class="notification-dropdown-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); font-weight: 700; color: var(--ink); font-size: 13px;">
+                  <span>Notifications</span>
+                  <button id="btnMarkAllRead" class="text-button" type="button" style="font-size: 11px; color: var(--green); font-weight: 600; cursor: pointer; background: transparent; border: none; padding: 0;">Mark all read</button>
+                </div>
+                <ul id="notificationList" class="notification-list" style="list-style: none; padding: 0; margin: 0;">
+                  <!-- Dynamically populated -->
+                </ul>
+                <div id="emptyNotifications" class="empty-state" style="padding: 20px; text-align: center; color: var(--muted); font-size: 12px; display: block;">
+                  No new notifications.
+                </div>
+              </div>
+            </div>
+
+            <div class="user-section" style="margin-left: 0;">
+              <span id="userDisplay" class="user-name"></span>
+              <button id="logoutBtn" class="ghost-button" type="button">Logout</button>
+            </div>
           </div>
         </div>
       </header>
@@ -1464,7 +1485,47 @@
     </article>
   </template>
 
-  <script src="app.js?v=20260702-reminder-calendar-v1"></script>
+  <!-- AI Financial Advisor Drawer -->
+  <button id="aiAdvisorFab" class="ai-advisor-fab" type="button" title="Ask AI Financial Advisor">
+    ✨ AI Advisor
+  </button>
+
+  <div id="aiAdvisorDrawer" class="ai-advisor-drawer" hidden>
+    <div class="ai-advisor-header">
+      <div class="ai-advisor-title">
+        <span class="sparkle-icon">✦</span>
+        <h3>AI Financial Advisor</h3>
+      </div>
+      <button id="btnCloseAiAdvisor" class="close-drawer-btn" type="button">&times;</button>
+    </div>
+    
+    <div id="aiAdvisorChatBody" class="ai-advisor-chat-body">
+      <div class="chat-messages" id="aiChatMessages">
+        <!-- Messages will be generated dynamically -->
+      </div>
+      
+      <div class="chat-suggestions" id="aiChatSuggestions">
+        <button class="suggestion-chip" type="button">Analyze my financial health</button>
+        <button class="suggestion-chip" type="button">How can I save more?</button>
+        <button class="suggestion-chip" type="button">Analyze my spending</button>
+        <button class="suggestion-chip" type="button">Show upcoming bills</button>
+      </div>
+    </div>
+
+    <div class="ai-advisor-footer">
+      <form id="aiAdvisorForm" class="ai-advisor-input-row">
+        <input id="aiAdvisorInput" type="text" placeholder="Ask anything about your finances..." autocomplete="off" required>
+        <button id="btnSendAiMessage" class="send-message-btn" type="submit">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        </button>
+      </form>
+      <div class="ai-disclaimer">AI responses may not be 100% accurate.</div>
+    </div>
+  </div>
+
+  <script src="app.js?v=20260703-security-v1"></script>
 </body>
 
 </html>
