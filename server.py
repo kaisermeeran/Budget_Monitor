@@ -1389,13 +1389,19 @@ class BudgetHandler(SimpleHTTPRequestHandler):
                                         processed_categories[key] = cat_id
                                     category_count += 1
 
-                            # Reconcile categories (delete categories not in plans)
+                            # Reconcile categories (delete categories not in plans and not used by transactions)
                             to_delete = []
                             for key, (cat_id, _) in cat_cache.items():
                                 if key not in processed_categories:
+                                    cur.execute("SELECT 1 FROM transactions WHERE category_id = %s LIMIT 1", (cat_id,))
+                                    if cur.fetchone():
+                                        continue
                                     to_delete.append(cat_id)
                             if to_delete:
                                 cur.execute("DELETE FROM categories WHERE id = ANY(%s)", (to_delete,))
+                                for key in list(cat_cache.keys()):
+                                    if cat_cache[key][0] in to_delete:
+                                        del cat_cache[key]
 
                             # 2. Fetch and cache all transactions for the user
                             cur.execute(
